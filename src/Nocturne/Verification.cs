@@ -22,6 +22,12 @@ public static partial class Verification
   try
   {
    await w.CatalogReady;
+   if(Environment.GetCommandLineArgs().Contains("--audit-release"))
+   {
+    await VerifyAudit(w);
+    State.Write("verification.json",new{completed=DateTimeOffset.Now,failures,checks});
+    return;
+   }
    if(Environment.GetCommandLineArgs().Contains("--branding-release"))
    {
     await VerifyBrandingRelease(w);
@@ -98,7 +104,7 @@ public static partial class Verification
    for(int i=0;i<9;i++){var p=Path.Combine(State.Home,$"cache{i}.png");File.Copy(Path.Combine(root,"作品 星夜","cover.png"),p,true);w.imageCache.Load(p);}Check("图片缓存容量限制",w.imageCache.Count<=4,"count="+w.imageCache.Count);
    var broken=Path.Combine(State.Home,"broken.mp3");File.WriteAllText(broken,"not audio");Check("损坏音频不崩溃",!w.OpenTrack(broken,true));await w.SubtitleReady;
    w.OpenTrack(path,false,2.2);await w.SubtitleReady;w.SetOffset(0.3);w.Save();var saved=State.Read<Settings>("settings.json");Check("作品进度与字幕偏移保存",saved.Resume[cd1].Seconds>=2.1&&saved.Tracks[path].Offset==0.3);
-   var offline=Path.Combine(State.Home,"offline-root");w.settings.Roots.Add(offline);await w.BuildTree();w.RemoveMediaRoot(offline);Check("离线根目录可以移除",!w.settings.Roots.Contains(offline));w.SelectFolder(cd1);
+   var offline=Path.Combine(State.Home,"offline-root");w.settings.Roots.Add(offline);await w.BuildTree();await w.RemoveMediaRoot(offline);Check("离线根目录可以移除",!w.settings.Roots.Contains(offline));w.SelectFolder(cd1);
    w.settings.Background=0;w.UpdateBackground();await w.BuildTree();await w.ImageReady;w.Navigate("detail");await Delay(500);Snapshot(w,Path.Combine(State.Home,"main-window.png"));w.Navigate("home");await Delay(500);Snapshot(w,Path.Combine(State.Home,"home.png"));w.OpenLyricsForTest();await Delay(300);Snapshot(w,Path.Combine(State.Home,"lyrics.png"));w.overlay.EndEditing();w.overlay.ShowPassive();w.overlay.SetText("中文 & 日本語\n多行桌面字幕预览");await Delay(200);Snapshot(w.overlay,Path.Combine(State.Home,"desktop-subtitles.png"));
    await VerifyVideo(w);
    await VerifyRevision3(w);

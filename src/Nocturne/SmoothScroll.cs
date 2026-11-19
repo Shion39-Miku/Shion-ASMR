@@ -34,7 +34,7 @@ public static class SmoothScroll
  internal static Action<int,double,double,string>? Trace;
  sealed class ScrollState
  {
-  readonly FrameworkElement owner;readonly FrameTicker timer=new();readonly Stopwatch clock=new();ScrollViewer? viewer;double target;int direction,followVersion;bool applying,wired;
+  readonly FrameworkElement owner;readonly FrameTicker timer=new();readonly Stopwatch clock=new();ScrollViewer? viewer;double target;int direction,followVersion;bool applying,wired;long lastWheel;
   public bool Running=>timer.IsEnabled;
   public ScrollState(FrameworkElement owner){this.owner=owner;owner.PreviewMouseWheel+=Wheel;owner.Unloaded+=(_,_)=>Stop();owner.IsVisibleChanged+=(_,_)=>{if(!owner.IsVisible)Stop();};timer.Tick+=(_,_)=>Tick();owner.Loaded+=(_,_)=>{viewer=Find(owner);if(viewer!=null&&!wired){wired=true;viewer.ScrollChanged+=(_,e)=>{if(!applying&&(e.ExtentHeightChange!=0||e.ViewportHeightChange!=0)){target=Math.Clamp(target,0,viewer.ScrollableHeight);}};}};}
   internal static ScrollViewer? Find(DependencyObject p){for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++){var c=VisualTreeHelper.GetChild(p,i);if(c is ScrollViewer s)return s;var found=Find(c);if(found!=null)return found;}return null;}
@@ -47,11 +47,11 @@ public static class SmoothScroll
    int sign=Math.Sign(e.Delta);if((viewer.VerticalOffset<=.1&&sign>0)||(viewer.VerticalOffset>=viewer.ScrollableHeight-.1&&sign<0)){Stop();return;}
    if(!timer.IsEnabled||direction!=sign)target=viewer.VerticalOffset;direction=sign;
    var lines=SystemParameters.WheelScrollLines;var distance=lines<0?viewer.ViewportHeight:Math.Max(1,lines)*18;
-   target=Math.Clamp(target-e.Delta/120.0*distance,0,viewer.ScrollableHeight);e.Handled=true;Trace?.Invoke(e.Delta,viewer.VerticalOffset,target,"target");
+   target=Math.Clamp(target-e.Delta/120.0*distance,0,viewer.ScrollableHeight);lastWheel=Stopwatch.GetTimestamp();e.Handled=true;Trace?.Invoke(e.Delta,viewer.VerticalOffset,target,"target");
    if(!SystemParameters.ClientAreaAnimation||Application.Current.MainWindow is MainWindow w&&w.settings.ReduceMotion){viewer.ScrollToVerticalOffset(target);return;}
    if(!timer.IsEnabled){clock.Restart();timer.Start();}
   }
-  void Tick(){if(viewer==null||!owner.IsVisible){Stop();return;}var dt=Math.Clamp(clock.Elapsed.TotalSeconds,.001,.05);clock.Restart();var current=viewer.VerticalOffset;var next=current+(target-current)*(1-Math.Exp(-dt/.055));if(Math.Abs(target-next)<.4){next=target;timer.Stop();}applying=true;viewer.ScrollToVerticalOffset(next);applying=false;}
+  void Tick(){if(viewer==null||!owner.IsVisible){Stop();return;}var dt=Math.Clamp(clock.Elapsed.TotalSeconds,.001,.05);clock.Restart();var current=viewer.VerticalOffset;var next=current+(target-current)*(1-Math.Exp(-dt/(direction==0?.055:.04)));if(Math.Abs(target-next)<.4||direction!=0&&Stopwatch.GetElapsedTime(lastWheel).TotalMilliseconds>=175){next=target;timer.Stop();}applying=true;viewer.ScrollToVerticalOffset(next);applying=false;}
   public void Stop(){timer.Stop();direction=0;followVersion++;}
   public void ToTop(){Stop();viewer??=Find(owner);viewer?.ScrollToTop();target=0;}
   public void Follow(ListBox list,object item,bool animate=true,bool refine=true)

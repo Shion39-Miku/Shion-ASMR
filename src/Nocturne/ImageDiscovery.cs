@@ -31,7 +31,8 @@ public static class ImageDiscovery
    if(stack.Count>0)errors.Add("超过8192个图片目录安全限制");
   }
   found=found.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(p=>Path.GetFileName(p),Natural.Instance).ThenBy(p=>p,Natural.Instance).ToList();
-  Log(audio,new IOException($"图片检索：owner={owner}; directories=[{string.Join(" | ",searched)}]; count={found.Count}; excluded=[{string.Join(" | ",skipped)}]; errors={string.Join(" | ",errors)}"));return new(found,errors.Count>0?string.Join("; ",errors):null);
+  if(found.Count==0||errors.Count>0)Log(audio,new IOException($"图片检索：owner={owner}; directories=[{string.Join(" | ",searched)}]; count={found.Count}; excluded=[{string.Join(" | ",skipped)}]; errors={string.Join(" | ",errors)}"));
+  return new(found,errors.Count>0?string.Join("; ",errors):null);
  }
  public static List<string> Read(string path){try{return Directory.EnumerateFiles(path).Where(p=>Library.ImageTypes.Contains(Path.GetExtension(p))).OrderBy(p=>Path.GetFileName(p),Natural.Instance).ToList();}catch(Exception ex) when(ex is IOException or UnauthorizedAccessException){Log(path,ex);return new();}}
  public static void Log(string? path,Exception error){try{var log=Path.Combine(State.Home,"image-errors.log");Directory.CreateDirectory(State.Home);if(File.Exists(log)&&new FileInfo(log).Length>262144)File.Move(log,log+".previous",true);File.AppendAllText(log,$"{DateTimeOffset.Now:O} | {path} | {error.GetType().Name}: {error.Message}\n");}catch{}}

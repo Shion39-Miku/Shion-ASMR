@@ -17,15 +17,24 @@ public partial class MainWindow
   Crumb(globalBrowse?"全部作品":"社团","");foreach(var f in chain)Crumb(f.Name,f.Id);
  }
  internal Task EnterFolder(string id)=>HomeReady=EnterFolderCore(id);
- async Task EnterFolderCore(string id)
+ async Task EnterFolderCore(string id,bool remember=true)
  {
-  if(id.Length>0&&!organization.Folders.ContainsKey(id))return;if(id!=browserFolder)RememberBrowse();var request=++browseSelectionRequest;++homeRequest;browserFolder=id;folderBrowsing=true;globalBrowse=false;viewMode="works";circleFilter=null;
+  if(id.Length>0&&!organization.Folders.ContainsKey(id))return;if(remember&&id!=browserFolder)RememberBrowse();var request=++browseSelectionRequest;++homeRequest;browserFolder=id;folderBrowsing=true;globalBrowse=false;viewMode="works";circleFilter=null;
   var top=id;while(organization.Folders.TryGetValue(top,out var parent)){circleFilter=parent.Name;if(parent.Parent.Length==0)break;top=parent.Parent;}
   UpdateBrowserMode();
   var ancestor=id;while(organization.Folders.TryGetValue(ancestor,out var f)){if(!settings.ExpandedFolders.Contains(ancestor))settings.ExpandedFolders.Add(ancestor);ancestor=f.Parent;}QueueSave();
   if(CurrentPage!="home")Navigate("home");await RefreshOrganization();if(request!=browseSelectionRequest||closing)return;await RenderHome();
  }
- async void ParentFolder(object sender,RoutedEventArgs e){if(browseHistory.Count>0)await ReturnBrowse();else await EnterFolder(organization.Folders.TryGetValue(browserFolder,out var f)?f.Parent:"");}
+ async void ParentFolder(object sender,RoutedEventArgs e)
+ {
+  if(organization.Folders.TryGetValue(browserFolder,out var current))
+  {
+   if(browseHistory.Count>0&&browseHistory[^1].Location==current.Parent)await ReturnBrowse();
+   else await (HomeReady=EnterFolderCore(current.Parent,remember:false));
+  }
+  else if(browseHistory.Count>0)await ReturnBrowse();
+  else await EnterFolder("");
+ }
  async void ToggleFolder(object sender,RoutedEventArgs e)
  {
   e.Handled=true;if(sender is not Button {Tag:TreeEntry row}||!row.Expandable)return;

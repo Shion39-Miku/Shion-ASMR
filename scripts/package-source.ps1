@@ -7,7 +7,7 @@ $version=[string]$projectXml.Project.PropertyGroup.Version
 $archive=Join-Path $root ('发行\Tsukisaki-Shion-'+$version+'-source.zip')
 # Include source and public documentation, skipping old local resources and generated output.
 $files=@(
-    foreach ($name in @('README.md','AGENTS.md','LICENSE','THIRD-PARTY-NOTICES.md','Directory.Build.props','NuGet.Config','.gitignore','docs\usage.md')) {
+    foreach ($name in @('README.md','AGENTS.md','LICENSE','THIRD-PARTY-NOTICES.md','Directory.Build.props','NuGet.Config','.gitignore','docs\usage.md','docs\audit-1.14.md')) {
         Get-Item -LiteralPath (Join-Path $root $name)
     }
     foreach ($name in @('src','scripts','docs\images','test-fixtures')) {

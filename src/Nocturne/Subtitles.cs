@@ -47,9 +47,15 @@ public sealed class SubtitleDocument
  }
  public List<int> Active(double seconds,bool holdPrevious=false)
  {
-  var list=new List<int>();int lo=0,hi=Cues.Count;while(lo<hi){int mid=(lo+hi)/2;if(Cues[mid].Start<=seconds)lo=mid+1;else hi=mid;}
+  var list=new List<int>();
+  FillActive(list,seconds,holdPrevious);
+  return list;
+ }
+ internal void FillActive(List<int> list,double seconds,bool holdPrevious=false)
+ {
+  list.Clear();int lo=0,hi=Cues.Count;while(lo<hi){int mid=(lo+hi)/2;if(Cues[mid].Start<=seconds)lo=mid+1;else hi=mid;}
   for(int i=lo-1;i>=0&&prefixEnd[i]>seconds;i--)if(Cues[i].End>seconds)list.Add(i);
   if(holdPrevious&&list.Count==0&&lo>0)list.Add(lo-1);
-  list.Reverse();return list;
+  list.Reverse();
  }
 }

@@ -31,7 +31,8 @@ public partial class MainWindow : Window
  internal string CurrentPage {get;private set;}="landing";public Task ImageReady {get;private set;}=Task.CompletedTask;
  internal bool ShuttingDown=>closing;public event Action? StartupCompleted;
  internal string TrayTitle=>tray?.Text??"";
- public MainWindow(bool test=false)
+ internal Task InitialScan {get;private set;}=Task.CompletedTask;
+ public MainWindow(bool test=false,bool startupProbe=false)
  {
   testing=test;settings=State.BootSettings??State.Read<Settings>("settings.json");State.BootSettings=null;settings.Migrate();library=new Library();InitializeComponent();NativeTheme.Attach(this);Motion.Use(settings);
   Width=Math.Clamp(settings.Width,820,3000);Height=Math.Clamp(settings.Height,680,2000);Left=settings.Left;Top=settings.Top;
@@ -40,7 +41,7 @@ public partial class MainWindow : Window
   sync.Tick+=(_,_)=>UpdateClock();searchTimer.Tick+=async(_,_)=>{searchTimer.Stop();await RenderHome();PopulateTracks();};saveTimer.Tick+=(_,_)=>{if(PlaybackPlaying||dirty)Save();};saveDebounce.Tick+=(_,_)=>{saveDebounce.Stop();Save();};
   video.Ended+=error=>{if(directVideo)OnEnded(error);else UpdateTimer();};
   engine.Ended+=error=>{var generation=engine.Generation;Dispatcher.BeginInvoke(()=>{if(!directVideo&&engine.Generation==generation)OnEnded(error);});};library.Changed+=()=>Dispatcher.BeginInvoke(async()=>{if(!closing)await Scan(false);});
-  Loaded+=async(_,_)=>{OverlayWindow.ClampToScreens(this);Navigate("landing");await BuildTree();StartupCompleted?.Invoke();if(!test)library.Watch(settings.Roots);UpdateVisuals();UpdateTimer();if(!test){saveTimer.Start();if(!File.Exists(Path.Combine(State.Home,"video-index-v1")))await Scan(false);}};
+  Loaded+=async(_,_)=>{OverlayWindow.ClampToScreens(this);Navigate("landing");await BuildTree();StartupCompleted?.Invoke();if(!test)library.Watch(settings.Roots);UpdateVisuals();UpdateTimer();if(!test)saveTimer.Start();if((!test||startupProbe)&&(settings.Roots.Count>0||library.Folders.Count>0))await (InitialScan=Scan(false));};
   StateChanged+=(_,_)=>{UpdateVisuals();UpdateTimer();if(WindowState!=WindowState.Minimized)UpdateSubtitle(true);else{SmoothScroll.Stop(SubtitleLines);SmoothScroll.Stop(WorksList);SmoothScroll.Stop(CircleChoices);}};IsVisibleChanged+=(_,_)=>{UpdateVisuals();UpdateTimer();};overlay.IsVisibleChanged+=(_,_)=>{UpdateOverlayButtons();UpdateTimer();};
   Microsoft.Win32.SystemEvents.DisplaySettingsChanged+=DisplayChanged;
   Closed+=(_,_)=>{closing=true;CancelFade();cancellation.Cancel();subtitleCancel?.Cancel();SmoothScroll.Stop(WorksList);overlay.Save();sync.Stop();saveTimer.Stop();searchTimer.Stop();saveDebounce.Stop();library.Dispose();engine.Analysis.Enabled=false;Wave.Configure(engine.Analysis,false,false,false);++videoRequest;ExitVideoFullscreen();video.Dispose();engine.Dispose();Stars.Configure(0,false);overlay.Finish();tray?.Dispose();Microsoft.Win32.SystemEvents.DisplaySettingsChanged-=DisplayChanged;};ready=true;
@@ -65,29 +66,38 @@ public partial class MainWindow : Window
  {
   if(page==CurrentPage){if(page=="lyrics"&&currentTrack!=null)BeginLyricsEntry();UpdateTimer();return;}
   if(page=="lyrics")lyricsOrigin=CaptureBrowse();var version=++navigationVersion;var next=page=="landing"?LandingPage:page=="home"?HomePage:page=="lyrics"?LyricsPage:DetailPage;
-  foreach(var panel in new[]{LandingPage,HomePage,DetailPage,LyricsPage})
+  var panels=new[]{LandingPage,HomePage,DetailPage,LyricsPage};
+  var outgoing=panels.Where(p=>p!=next&&p.Visibility==Visibility.Visible).MaxBy(p=>p.Opacity);
+  foreach(var panel in panels)
   {
+   var opacity=panel.Visibility==Visibility.Visible?panel.Opacity:0;
+   var offset=panel.RenderTransform is TranslateTransform translation?translation.Y:0;
    panel.BeginAnimation(OpacityProperty,null);
-   if(panel==next){panel.Visibility=Visibility.Visible;Motion.Enter(panel,settings);Panel.SetZIndex(panel,1);}
-   else if(panel.Visibility==Visibility.Visible&&Motion.Enabled(settings)&&WindowState!=WindowState.Minimized)
+   if(panel==next){panel.Visibility=Visibility.Visible;Motion.Enter(panel,settings,opacity,offset);Panel.SetZIndex(panel,1);}
+   else if(panel==outgoing&&opacity>.01&&Motion.Enabled(settings)&&IsVisible&&WindowState!=WindowState.Minimized)
    {
-    Panel.SetZIndex(panel,0);var old=panel;var fade=new DoubleAnimation(panel.Opacity,0,TimeSpan.FromMilliseconds(400));fade.Completed+=(_,_)=>{if(version==navigationVersion){old.Visibility=Visibility.Collapsed;old.BeginAnimation(OpacityProperty,null);old.Opacity=1;}};panel.BeginAnimation(OpacityProperty,fade);
+    Panel.SetZIndex(panel,0);panel.RenderTransform=new TranslateTransform(0,offset);
+    var fade=new DoubleAnimation(opacity,0,TimeSpan.FromMilliseconds(400)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut}};
+    fade.Completed+=(_,_)=>{if(version==navigationVersion){panel.Visibility=Visibility.Collapsed;panel.BeginAnimation(OpacityProperty,null);panel.Opacity=1;}};panel.BeginAnimation(OpacityProperty,fade);
    }else panel.Visibility=Visibility.Collapsed;
    panel.IsHitTestVisible=panel==next;
   }
   CurrentPage=page;NavigationBar.Visibility=page=="landing"?Visibility.Collapsed:Visibility.Visible;NavigationRow.Height=new GridLength(page=="landing"?0:62);if(page=="lyrics"&&currentTrack!=null){BeginLyricsEntry();UpdatePictures();}else CancelLyricsEntry();UpdateVideoSurface();UpdateTimer();
  }
- void GoHome(object sender,RoutedEventArgs e){Navigate("landing");}
+ void GoHome(object sender,RoutedEventArgs e){++browseSelectionRequest;Navigate("landing");}
  internal bool OpenTrack(string path,bool play,double? position=null,bool revealVideo=true)
  {
   if(!File.Exists(path)){Status.Text="未找到文件，请检查磁盘连接或刷新媒体文件夹。";return false;}
   if(!Library.AudioTypes.Contains(Path.GetExtension(path))&&!Library.VideoTypes.Contains(Path.GetExtension(path))){Status.Text="不支持此格式，请选择 WAV、MP3、FLAC、M4A、OGG 或常见视频文件。";return false;}
   if(Library.VideoTypes.Contains(Path.GetExtension(path))){VideoReady=OpenVideo(path,true,play,position,revealVideo);return true;}
-  Save();CancelFade();++videoRequest;ExitVideoFullscreen();video.Close();directVideo=false;hiddenVideoResume=false;companionSync=false;VideoSync.IsChecked=false;UpdateVideoSurface();try
+  Save();
+  var page=CurrentPage;var target=Path.GetDirectoryName(path)!;var preference=settings.Tracks.GetValueOrDefault(path)??new TrackPreference();
+  var seconds=position??preference.Position??(settings.Resume.TryGetValue(target,out var legacy)&&legacy.Track==path?legacy.Seconds:0);
+  try{engine.Open(path,seconds);}
+  catch(Exception ex){Status.Text="无法打开音轨。请检查文件是否损坏，或确认可用的 Windows 解码组件。"+(PlaybackPath==null?"":" 已保留当前播放。")+" "+ex.Message;UpdateTimer();return false;}
+  CancelFade();++videoRequest;ExitVideoFullscreen();video.Close();directVideo=false;hiddenVideoResume=false;companionSync=false;VideoSync.IsChecked=false;UpdateVideoSurface();try
   {
-   var page=CurrentPage;var target=Path.GetDirectoryName(path)!;if(!settings.Tracks.TryGetValue(path,out var preference))settings.Tracks[path]=preference=new();
-   var seconds=position??preference.Position??(settings.Resume.TryGetValue(target,out var legacy)&&legacy.Track==path?legacy.Seconds:0);
-   engine.Open(path,seconds);currentTrack=path;CaptureQueue(path);lastTrackCandidate=path;ContinueButton.Visibility=Visibility.Visible;preference.LastPlayed=DateTimeOffset.Now;
+   settings.Tracks.TryAdd(path,preference);currentTrack=path;CaptureQueue(path);lastTrackCandidate=path;ContinueButton.Visibility=Visibility.Visible;preference.LastPlayed=DateTimeOffset.Now;
    if(CurrentPage=="home")RememberBrowse();SelectFolder(target);Navigate(play&&revealVideo?"lyrics":page);Preference().LyricsOpen=play&&revealVideo;LoadSubtitleChoices();NowPlaying.Text=Path.GetFileNameWithoutExtension(path);LyricTrackName.Text=NowPlaying.Text;
    AudioInfo.Text=$"{Path.GetExtension(path).TrimStart('.').ToUpperInvariant()} · {engine.Channels} 声道 · 原声";Status.Text="正在收听 · "+(currentWork?.Name??Path.GetFileName(target));
    Progress.Maximum=Math.Max(1,engine.Duration);Total.Text=Format(engine.Duration);if(play)engine.Play();
@@ -125,9 +135,22 @@ public partial class MainWindow : Window
   overlay.SetPlaying(fadeDesired??PlaybackPlaying);PlayerTimeline.Visibility=currentTrack==null?Visibility.Collapsed:Visibility.Visible;PlayIcon.Kind=(fadeDesired??PlaybackPlaying)?"Pause":"Play";var label=(fadeDesired??PlaybackPlaying)?"暂停":"播放";PlayButton.ToolTip=label;AutomationProperties.SetName(PlayButton,label);
   UpdateOverlayButtons();PreviousButton.IsEnabled=NextButton.IsEnabled=currentTrack!=null;WavePanel.Visibility=settings.Visualizer&&!directVideo&&currentTrack!=null?Visibility.Visible:Visibility.Collapsed;Wave.Configure(engine.Analysis,engine.Playing,visible&&FrontInteraction&&CurrentPage=="lyrics",settings.Visualizer&&!directVideo);
  }
- internal void UpdateClock(){if(IsVisible&&WindowState!=WindowState.Minimized&&fullscreen==null){var seconds=PlaybackPosition;if(!seeking)Progress.Value=seconds;Elapsed.Text=Format(seconds);}SynchronizeCompanion();if(video.Path!=null&&(fullscreen?.IsVisible==true||IsVisible&&WindowState!=WindowState.Minimized&&CurrentPage=="lyrics"))UpdateVideoControls();UpdateSubtitle();}
+ internal void UpdateClock()
+ {
+  double? position=null;
+  if(IsVisible&&WindowState!=WindowState.Minimized&&fullscreen==null)
+  {
+   position=PlaybackPosition;
+   if(!seeking)Progress.Value=position.Value;
+   var elapsed=Format(position.Value);if(Elapsed.Text!=elapsed)Elapsed.Text=elapsed;
+  }
+  SynchronizeCompanion();
+  if(video.Path!=null&&(fullscreen?.IsVisible==true||IsVisible&&WindowState!=WindowState.Minimized&&CurrentPage=="lyrics"))UpdateVideoControls();
+  UpdateSubtitle(position:position);
+ }
  internal static string Format(double seconds)=>TimeSpan.FromSeconds(Math.Max(0,seconds)).ToString(seconds>=3600?@"h\:mm\:ss":@"mm\:ss");
- bool FrontInteraction=>IsActive||OwnedWindows.Cast<Window>().Any(w=>w!=fullscreen&&w.IsActive);
+ internal bool AuditForeground {get;set;}
+ bool FrontInteraction=>testing&&AuditForeground||IsActive||OwnedWindows.Cast<Window>().Any(w=>w!=fullscreen&&w.IsActive);
  internal void UpdateVisuals(){if(closing){Stars.Configure(0,false);return;}Stars.Visibility=Visibility.Visible;Stars.ConfigurePetals(settings.Sakura&&!settings.ReduceMotion,settings.SakuraStrength);Stars.Configure(settings.ReduceMotion?0:settings.Stars,IsVisible&&FrontInteraction&&WindowState!=WindowState.Minimized&&fullscreen==null,settings.StarIntensity);UpdateVideoSurface();}
  void ToggleOverlay(object sender,RoutedEventArgs e)
  {

@@ -57,6 +57,8 @@ public static partial class Verification
   await WaitForPosition(w,3.6);await Delay(160);
   Check("播放到下一句才同步更新并滚动居中",Matches(second)&&Highlighted().SequenceEqual(new[]{second})&&CenterError(w)<5);
   w.PausePlayback();
+  // Keep the always-on-top editor clear of the main rail under test.
+  w.overlay.Left=w.Left+30;w.overlay.Top=w.Top+55;
   await VideoRail(w.Progress,2.2/w.PlaybackDuration,drag:true);
   Check("原生拖动进度条到较早空档按目标时间取句",Math.Abs(w.PlaybackPosition-2.2)<.2&&Matches(first)&&Highlighted().SequenceEqual(new[]{first})&&CenterError(w)<5);
   w.Seek(5.3);await Delay(120);

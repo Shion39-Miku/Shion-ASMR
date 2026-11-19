@@ -70,19 +70,29 @@ public partial class MainWindow
  void OffsetMinus(object sender,RoutedEventArgs e)=>SetOffset(Preference().Offset-0.1);
  void OffsetPlus(object sender,RoutedEventArgs e)=>SetOffset(Preference().Offset+0.1);
  List<int> ActivePlaybackCues()=>document.Active(PlaybackPosition-Preference().Offset,holdPrevious:!directVideo);
- void UpdateSubtitle(bool forceFollow=false)
+ List<int> activeCueBuffer=new();
+ void UpdateSubtitle(bool forceFollow=false,double? position=null)
  {
-  var active=ActivePlaybackCues();var value=string.Join("\n",active.Select(i=>document.Cues[i].Text));bool changed=!active.SequenceEqual(lastIndices);
-  if(changed||forceFollow)lastIndices=active;
+  var preference=Preference();
+  document.FillActive(activeCueBuffer,(position??PlaybackPosition)-preference.Offset,holdPrevious:!directVideo);
+  bool changed=!activeCueBuffer.SequenceEqual(lastIndices);
+  if(changed)(lastIndices,activeCueBuffer)=(activeCueBuffer,lastIndices);
+  var active=lastIndices;
   if((changed||forceFollow)&&CurrentPage=="lyrics"&&fullscreen==null&&WindowState!=WindowState.Minimized)RefreshLyricHighlights(active);
   if(lyricEntryPending)QueueLyricsEntryCenter();
-  if(!lyricEntryPending&&(changed||forceFollow)&&active.Count>0&&(Preference().FollowLyrics||forceFollow)&&CurrentPage=="lyrics"&&(FrontInteraction||overlay.IsActive)&&WindowState!=WindowState.Minimized&&fullscreen==null)
+  if(!lyricEntryPending&&(changed||forceFollow)&&active.Count>0&&(preference.FollowLyrics||forceFollow)&&CurrentPage=="lyrics"&&(FrontInteraction||overlay.IsActive)&&WindowState!=WindowState.Minimized&&fullscreen==null)
   {
    var request=++followRequest;var track=currentTrack;var cue=document.Cues[active[0]];
    Dispatcher.BeginInvoke(()=>{if(request==followRequest&&Preference().FollowLyrics&&track==currentTrack&&CurrentPage=="lyrics"&&WindowState!=WindowState.Minimized){allowLyricBring=true;try{SmoothScroll.Follow(SubtitleLines,cue,Motion.Enabled(settings));}finally{allowLyricBring=false;}}},System.Windows.Threading.DispatcherPriority.Loaded);
   }
-  FollowButton.Content=Preference().FollowLyrics?"正在跟随字幕":"回到当前台词";
-  if(value!=lastSubtitle){lastSubtitle=value;overlay.SetText(value);}UpdateFooterSubtitle();UpdateVideoSubtitle();
+  if(changed||forceFollow)
+  {
+   FollowButton.Content=preference.FollowLyrics?"正在跟随字幕":"回到当前台词";
+   var value=string.Join("\n",active.Select(i=>document.Cues[i].Text));
+   if(value!=lastSubtitle){lastSubtitle=value;overlay.SetText(value);}
+   UpdateFooterSubtitle();
+  }
+  if(video.Path!=null)UpdateVideoSubtitle();
  }
  readonly System.Runtime.CompilerServices.ConditionalWeakTable<ListBoxItem,object> lyricSizes=new();
  void RefreshLyricHighlights(System.Collections.Generic.List<int> active)

@@ -34,16 +34,31 @@ public sealed class AudioEngine : IDisposable
  public float Volume {get=>gain;set{gain=Math.Clamp(value,0,1);if(volume!=null)volume.Volume=gain;}}
  public void Open(string path,double seconds=0)
  {
-  DisposeStream();try {reader=Path.GetExtension(path).Equals(".ogg",StringComparison.OrdinalIgnoreCase)?new VorbisWaveReader(path):new AudioFileReader(path);FilePath=path;Seek(seconds,false);}catch{DisposeStream();throw;}
+  WaveStream next=Path.GetExtension(path).Equals(".ogg",StringComparison.OrdinalIgnoreCase)?new VorbisWaveReader(path):new AudioFileReader(path);
+  var device=NewDevice();
+  try
+  {
+   next.CurrentTime=TimeSpan.FromSeconds(Math.Clamp(seconds,0,Math.Max(0,next.TotalTime.TotalSeconds-.001)));
+   var start=next.CurrentTime.TotalSeconds;
+   var nextVolume=new VolumeSampleProvider(next.ToSampleProvider()){Volume=gain};
+   var nextEnvelope=new FadeProvider(nextVolume);
+   device.Init(new AnalysisProvider(nextEnvelope,Analysis));
+   DisposeStream();
+   reader=next;output=device;volume=nextVolume;envelope=nextEnvelope;anchor=start;FilePath=path;
+   Analysis.Clear();WatchStopped(device);
+  }
+  catch{device.Dispose();next.Dispose();throw;}
  }
+ static WaveOutEvent NewDevice()=>new(){DesiredLatency=120,NumberOfBuffers=3};
+ void WatchStopped(WaveOutEvent device){var current=version;device.PlaybackStopped+=(_,e)=>{if(current==version)Ended?.Invoke(e.Exception);};}
  public void Seek(double seconds,bool play)
  {
   if(reader==null)return;version++;output?.Stop();output?.Dispose();output=null;
   anchor=Math.Clamp(seconds,0,Math.Max(0,Duration-0.001));reader.CurrentTime=TimeSpan.FromSeconds(anchor);
   // Anchor at the decoder's actual seek result, accounting for block-aligned formats.
   anchor=reader.CurrentTime.TotalSeconds;
-  volume=new VolumeSampleProvider(reader.ToSampleProvider()){Volume=gain};output=new WaveOutEvent{DesiredLatency=120,NumberOfBuffers=3};
-  envelope=new FadeProvider(volume);Analysis.Clear();output.Init(new AnalysisProvider(envelope,Analysis));var current=version;output.PlaybackStopped+=(_,e)=>{if(current==version)Ended?.Invoke(e.Exception);};if(play)output.Play();
+  volume=new VolumeSampleProvider(reader.ToSampleProvider()){Volume=gain};output=NewDevice();
+  envelope=new FadeProvider(volume);Analysis.Clear();output.Init(new AnalysisProvider(envelope,Analysis));WatchStopped(output);if(play)output.Play();
  }
  public void Play(){if(reader!=null&&Position>=Duration-0.05){var temporary=TemporaryGain;Seek(0,false);Fade(temporary);output?.Play();}else output?.Play();}
  public void Pause()=>output?.Pause();

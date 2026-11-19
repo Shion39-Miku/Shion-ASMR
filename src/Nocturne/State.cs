@@ -65,5 +65,11 @@ public static class State
  public static readonly string DefaultHome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Nocturne");
  public static string Home=DefaultHome;
  public static T Read<T>(string name) where T:new() {try{return JsonSerializer.Deserialize<T>(File.ReadAllText(Path.Combine(Home,name))) ?? new T();}catch{return new T();}}
- public static void Write<T>(string name,T value) {Directory.CreateDirectory(Home); var file=Path.Combine(Home,name); File.WriteAllText(file+".tmp",JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true})); File.Move(file+".tmp",file,true);}
+ static readonly JsonSerializerOptions indentedJson=new(){WriteIndented=true};
+ public static void Write<T>(string name,T value)
+ {
+  Directory.CreateDirectory(Home);var file=Path.Combine(Home,name);var pending=file+".tmp";
+  using(var stream=File.Create(pending))JsonSerializer.Serialize(stream,value,indentedJson);
+  File.Move(pending,file,true);
+ }
 }

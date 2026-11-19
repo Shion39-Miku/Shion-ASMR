@@ -62,6 +62,6 @@ public partial class MainWindow
  void UpdateBrowserMode()
  {
   var tree=folderBrowsing&&showFolderTree;FolderBreadcrumbBar.Visibility=Visibility.Visible;FolderTree.Visibility=tree?Visibility.Visible:Visibility.Collapsed;
-  CircleChoices.VerticalAlignment=tree?VerticalAlignment.Top:VerticalAlignment.Stretch;CircleChoices.Height=tree?170:double.NaN;FolderTree.Margin=new Thickness(0,tree?178:0,0,0);
+  FolderTreeRow.Height=tree?new GridLength(1.3,GridUnitType.Star):new GridLength(0);
  }
 }

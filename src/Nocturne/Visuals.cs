@@ -30,11 +30,12 @@ public static class Motion
   EventManager.RegisterClassHandler(typeof(ListBox),Selector.SelectionChangedEvent,new SelectionChangedEventHandler((sender,e)=>{if(current==null||!Enabled(current)||sender is not ListBox list)return;foreach(var added in e.AddedItems)if(list.ItemContainerGenerator.ContainerFromItem(added) is ListBoxItem item)item.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0.65,1,TimeSpan.FromMilliseconds(240)));}));
  }
  public static bool Enabled(Settings s)=>!s.ReduceMotion&&SystemParameters.ClientAreaAnimation;
- public static void Enter(UIElement view,Settings settings)
+ public static void Enter(UIElement view,Settings settings,double opacity,double offset)
  {
-  var from=view.Visibility==Visibility.Visible?Math.Min(.45,view.Opacity):0;view.BeginAnimation(UIElement.OpacityProperty,null);view.Opacity=1;if(!Enabled(settings))return;
-  view.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(from,1,TimeSpan.FromMilliseconds(400)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut}});
-  var translate=new TranslateTransform();view.RenderTransform=translate;translate.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(7,0,TimeSpan.FromMilliseconds(400)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut}});
+  view.Opacity=1;
+  var translate=new TranslateTransform();view.RenderTransform=translate;if(!Enabled(settings))return;
+  view.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(opacity,1,TimeSpan.FromMilliseconds(400)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut},FillBehavior=FillBehavior.Stop});
+  translate.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(opacity>0?offset:7,0,TimeSpan.FromMilliseconds(400)){EasingFunction=new CubicEase{EasingMode=EasingMode.EaseInOut},FillBehavior=FillBehavior.Stop});
  }
 }
 // Samples are observed without being modified. Bounded waveform history, no FFT workers or file rereads.
@@ -57,10 +58,24 @@ sealed class AnalysisProvider : ISampleProvider
 public sealed class AudioWave : FrameworkElement
 {
  readonly FrameTicker timer=new();readonly float[] values=new float[72],source=new float[72];readonly Pen pen=new(new SolidColorBrush(Color.FromArgb(220,200,175,233)),1.6){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};AudioAnalysis? analysis;bool playing;DateTime stopAt;
+ readonly DrawingVisual waveform=new();
  public bool Running=>timer.IsEnabled;public long Frames {get;private set;}public long DrawFrames{get;private set;}
  internal static float Map(float rms)=>rms<=.00025f?0:(float)Math.Pow(Math.Clamp((20*Math.Log10(rms)+72)/54,0,1),.9);
  internal float Peak=>System.Linq.Enumerable.Max(values);
- public AudioWave(){IsHitTestVisible=false;pen.Freeze();timer.Tick+=(_,_)=>{if(playing)analysis?.Copy(source);else Array.Clear(source);for(int i=0;i<values.Length;i++){var target=Map(source[i]);values[i]+=(target-values[i])*(target>values[i]?.78f:.30f);}if(!playing&&DateTime.UtcNow>=stopAt){Array.Clear(values);timer.Stop();}InvalidateVisual();Frames++;};}
+ public AudioWave(){IsHitTestVisible=false;AddVisualChild(waveform);pen.Freeze();timer.Tick+=(_,_)=>{if(playing)analysis?.Copy(source);else Array.Clear(source);for(int i=0;i<values.Length;i++){var target=Map(source[i]);values[i]+=(target-values[i])*(target>values[i]?.78f:.30f);}if(!playing&&DateTime.UtcNow>=stopAt){Array.Clear(values);timer.Stop();}DrawFrame();Frames++;};}
+ protected override int VisualChildrenCount=>1;
+ protected override Visual GetVisualChild(int index)=>index==0?waveform:throw new ArgumentOutOfRangeException(nameof(index));
  public void Configure(AudioAnalysis data,bool isPlaying,bool visible,bool enabled){analysis=data;if(playing&&!isPlaying)stopAt=DateTime.UtcNow.AddMilliseconds(450);playing=isPlaying;analysis.Enabled=visible&&enabled&&isPlaying;if(!visible||!enabled){timer.Stop();return;}if(isPlaying||DateTime.UtcNow<stopAt&&Array.Exists(values,x=>x>0.0001f))timer.Start();else timer.Stop();}
- protected override void OnRender(DrawingContext dc){var begin=DrawTiming.Begin();DrawFrames++;if(ActualWidth<=0)return;double step=ActualWidth/values.Length;for(int i=0;i<values.Length;i++){double height=Math.Min(ActualHeight,1+values[i]*(ActualHeight-1));var x=(i+.5)*step;dc.DrawLine(pen,new Point(x,(ActualHeight-height)/2),new Point(x,(ActualHeight+height)/2));}DrawTiming.End("wave",begin);}
+ protected override void OnRender(DrawingContext dc){base.OnRender(dc);DrawFrame();}
+ void DrawFrame()
+ {
+  if(!IsVisible||ActualWidth<=0||ActualHeight<=0)return;
+  var begin=DrawTiming.Begin();DrawFrames++;
+  using(var dc=waveform.RenderOpen())
+  {
+   double step=ActualWidth/values.Length;
+   for(int i=0;i<values.Length;i++){double height=Math.Min(ActualHeight,1+values[i]*(ActualHeight-1));var x=(i+.5)*step;dc.DrawLine(pen,new Point(x,(ActualHeight-height)/2),new Point(x,(ActualHeight+height)/2));}
+  }
+  DrawTiming.End("wave",begin);
+ }
 }

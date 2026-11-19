@@ -13,15 +13,26 @@ using System.Threading;
 namespace Nocturne;
 public partial class MainWindow
 {
- int pictureSearchRequest;List<string> pictures=new();int imageIndex,imageRequest;bool imageFit=true;double imageZoom=1;
+ int pictureSearchRequest;List<string> pictures=new();int imageIndex,imageRequest;bool imageFit=true;double imageZoom=1;string? pictureSource;
  CancellationTokenSource? imageDecode,pictureSearchCancel;
  internal IReadOnlyList<string> PicturePaths=>pictures;internal int PictureIndex=>imageIndex;
  internal void UpdatePictures()=>ImageReady=DiscoverPictures();
  async Task DiscoverPictures()
  {
   var request=++pictureSearchRequest;pictureSearchCancel?.Cancel();pictureSearchCancel?.Dispose();var cancel=pictureSearchCancel=CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);var token=cancel.Token;
-  var track=currentTrack;var path=folder;var catalog=works.ToArray();var work=CurrentPage=="lyrics"&&track!=null?catalog.FirstOrDefault(w=>w.Groups.Any(g=>g.Audio.Contains(track)))??currentWork:currentWork;var source=CurrentPage=="lyrics"&&track!=null?track:System.IO.Path.Combine(path,"_preview.wav");
-  try{var result=await Task.Run(()=>ImageDiscovery.Find(source,work,catalog,token),token);var found=result.Files;if(request!=pictureSearchRequest||path!=folder||track!=currentTrack||closing)return;pictures=found;imageIndex=0;imageFit=true;await ShowPicture();if(result.Error!=null){Status.Text="图片目录读取失败："+result.Error;if(found.Count==0){LyricsImageCount.Text="图片检索失败";ImageName.Text=Status.Text;}}ArrangeMedia();UpdateBackground();}
+  var track=currentTrack;var path=folder;var catalog=works;var selectedWork=currentWork;var fromTrack=CurrentPage=="lyrics"&&track!=null;var source=fromTrack?track!:Path.Combine(path,"_preview.wav");
+  try
+  {
+   var result=await Task.Run(()=>ImageDiscovery.Find(source,fromTrack?null:selectedWork,catalog,token),token);
+   if(request!=pictureSearchRequest||path!=folder||track!=currentTrack||closing)return;
+   var previous=pictureSource==source?pictures.ElementAtOrDefault(imageIndex):null;
+   if(pictureSource!=source)imageFit=true;
+   pictureSource=source;pictures=result.Files;imageIndex=previous==null?0:Math.Max(0,pictures.FindIndex(p=>p.Equals(previous,StringComparison.OrdinalIgnoreCase)));
+   await ShowPicture();
+   if(request!=pictureSearchRequest||closing)return;
+   if(result.Error!=null){Status.Text="图片目录读取失败："+result.Error;if(pictures.Count==0){LyricsImageCount.Text="图片检索失败";ImageName.Text=Status.Text;}}
+   ArrangeMedia();UpdateBackground();
+  }
   catch(OperationCanceledException){}
  }
  async Task ShowPicture()
@@ -39,7 +50,8 @@ public partial class MainWindow
     var fade=new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(400));fade.Completed+=(_,_)=>{if(version==imageRequest)PicturePrevious.Source=null;};Picture.BeginAnimation(OpacityProperty,fade);
    }else PicturePrevious.Source=null;
   }
-  catch(Exception ex){if(version==imageRequest){ImageDiscovery.Log(path,ex);LyricsImageCount.Text="图片读取失败";Status.Text="图片存在但无法读取："+ex.Message;Picture.Source=PicturePrevious.Source=LyricsPicture.Source=LyricsPicturePrevious.Source=null;NoPicture.Visibility=Visibility.Visible;ImageName.Text="图片无法显示："+ex.Message;}}
+  catch(OperationCanceledException) when(decode.IsCancellationRequested){}
+  catch(Exception ex){if(version==imageRequest&&!closing){ImageDiscovery.Log(path,ex);LyricsImageCount.Text="图片读取失败";Status.Text="图片存在但无法读取："+ex.Message;Picture.Source=PicturePrevious.Source=LyricsPicture.Source=LyricsPicturePrevious.Source=null;NoPicture.Visibility=Visibility.Visible;ImageName.Text="图片无法显示："+ex.Message;}}
  }
  void PreviousImage(object sender,RoutedEventArgs e)=>BrowsePicture(-1);
  void NextImage(object sender,RoutedEventArgs e)=>BrowsePicture(1);
@@ -51,6 +63,15 @@ public partial class MainWindow
  void PictureViewportChanged(object sender,SizeChangedEventArgs e){if(imageFit)ResizeImage();}
  void SetCover(object sender,RoutedEventArgs e){if(pictures.Count>0&&currentWork!=null)ChooseCover(pictures[imageIndex]);}
  void PickCover(object sender,RoutedEventArgs e){if(currentWork==null)return;var d=new OpenFileDialog{Title="选择分类封面",Filter="图片|*.jpg;*.jpeg;*.png;*.webp;*.bmp"};if(d.ShowDialog(this)==true)ChooseCover(d.FileName);}
- internal void ChooseCover(string path){if(currentWork==null)return;settings.WorkCovers[currentWork.Path]=path;currentWork.Cover=path;RenderHome();UpdateBackground();Save();}
+ internal void ChooseCover(string path)
+ {
+  if(currentWork==null)return;
+  settings.WorkCovers[currentWork.Path]=path;
+  if(!string.Equals(currentWork.Cover,path,StringComparison.OrdinalIgnoreCase))
+  {
+   currentWork.Cover=path;lastHomeSignature=null;_ = RenderHome();
+  }
+  Save();
+ }
  internal void UpdateBackground(){Backdrop.Source=null;UpdateVisuals();} // Global background is always the starfield; artwork stays inside its own viewport.
 }

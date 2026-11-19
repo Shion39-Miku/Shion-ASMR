@@ -105,7 +105,7 @@
        <TextBlock x:Name="HomeTitle" Text="选择今晚的声音" FontSize="24" FontWeight="SemiBold" LineHeight="32" MaxHeight="64" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
       </DockPanel>
       <DockPanel Margin="0,2,0,0">
-       <TextBlock x:Name="LibraryInfo" FontSize="11" Text="本地收藏，在星光下慢慢听。" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+       <TextBlock x:Name="LibraryInfo" FontSize="12" Text="正在整理本地媒体…" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
       </DockPanel>
       <WrapPanel>
        <Button x:Name="TagFilterButton" Content="标签筛选" Click="ToggleTagFilters" />
@@ -157,6 +157,10 @@
          <Grid><TextBox x:Name="CircleSearch" TextChanged="CircleSearchChanged" FontSize="14" Padding="12,9" ToolTip="搜索社团名称" AutomationProperties.Name="搜索社团"/><TextBlock Text="搜索社团" FontSize="13" Foreground="{StaticResource Muted}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text,ElementName=CircleSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
         </StackPanel>
         <Grid x:Name="BrowserSidebarBody" Grid.Row="1">
+         <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition x:Name="FolderTreeRow" Height="0" />
+         </Grid.RowDefinitions>
          <ListBox x:Name="CircleChoices" SelectedValuePath="Id" PreviewMouseLeftButtonDown="CircleMouseDown" SelectionChanged="CircleSelected" ItemContainerStyle="{StaticResource CircleRow}" local:SmoothScroll.Enabled="True" ScrollViewer.VerticalScrollBarVisibility="Auto">
           <ListBox.ItemTemplate>
            <DataTemplate>
@@ -171,7 +175,7 @@
            </DataTemplate>
           </ListBox.ItemTemplate>
          </ListBox>
-         <ListBox x:Name="FolderTree" local:SmoothScroll.Enabled="True" ItemContainerStyle="{StaticResource PlainRow}" ScrollViewer.VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+         <ListBox x:Name="FolderTree" Grid.Row="1" Margin="0,8,0,0" local:SmoothScroll.Enabled="True" ItemContainerStyle="{StaticResource PlainRow}" ScrollViewer.VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
           <ListBox.ItemTemplate>
            <DataTemplate>
             <Grid Height="42" Margin="{Binding Indent}">
@@ -541,7 +545,7 @@
          <ColumnDefinition Width="*" />
          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <TextBlock x:Name="AudioInfo" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="从主页选择本地音频或视频" Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center" />
+        <TextBlock x:Name="AudioInfo" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="从主页选择本地音频或视频" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
        </Grid>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -556,7 +560,7 @@
        </Button>
       </StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-       <ComboBox x:Name="LoopChoice" Width="100" SelectionChanged="LoopChanged">
+       <ComboBox x:Name="LoopChoice" Width="104" SelectionChanged="LoopChanged" AutomationProperties.Name="播放模式" ToolTip="{Binding SelectedItem.Content, RelativeSource={RelativeSource Self}}">
         <ComboBoxItem Content="顺序播放" />
         <ComboBoxItem Content="列表循环" />
         <ComboBoxItem Content="单曲循环" /><ComboBoxItem Content="播完当前文件夹后暂停" />

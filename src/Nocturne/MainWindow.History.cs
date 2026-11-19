@@ -19,9 +19,15 @@ public partial class MainWindow
   restoringBrowser=true;
   try
   {
-   ++browseSelectionRequest;++homeRequest;searchTimer.Stop();filterLoading=true;browserFolder=state.Location;globalBrowse=state.Global;folderBrowsing=state.Folders;showFolderTree=state.Tree;viewMode=state.Mode;circleFilter=state.Circle;tagFilter=state.Tag;Search.Text=state.Search;CircleSearch.Text=state.CircleSearch;settings.ExpandedFolders=state.Expanded.ToList();filterLoading=false;searchTimer.Stop();RefreshFilterChoices();UpdateBrowserMode();
+   var request=++browseSelectionRequest;++homeRequest;searchTimer.Stop();filterLoading=true;browserFolder=state.Location;globalBrowse=state.Global;folderBrowsing=state.Folders;showFolderTree=state.Tree;viewMode=state.Mode;circleFilter=state.Circle;tagFilter=state.Tag;Search.Text=state.Search;CircleSearch.Text=state.CircleSearch;settings.ExpandedFolders=state.Expanded.ToList();filterLoading=false;searchTimer.Stop();RefreshFilterChoices();UpdateBrowserMode();
    if(state.Page=="detail"&&state.Work!=null&&works.FirstOrDefault(x=>x.Path==state.Work) is Work work){currentWork=work;folder=state.Group;PopulateGroups();PopulateTracks();UpdatePictures();Navigate("detail");}
-   else{await RefreshOrganization();await RenderHome();Navigate(state.Page=="landing"?"landing":"home");await Dispatcher.InvokeAsync(()=>{SmoothScroll.Stop(WorksList);BrowserScroll(WorksList)?.ScrollToVerticalOffset(state.Scroll);},DispatcherPriority.ContextIdle);}
+   else
+   {
+    await RefreshOrganization();if(request!=browseSelectionRequest||closing)return;
+    await RenderHome();if(request!=browseSelectionRequest||closing)return;
+    Navigate(state.Page=="landing"?"landing":"home");
+    await Dispatcher.InvokeAsync(()=>{if(request==browseSelectionRequest&&!closing){SmoothScroll.Stop(WorksList);BrowserScroll(WorksList)?.ScrollToVerticalOffset(state.Scroll);}},DispatcherPriority.ContextIdle);
+   }
   }
   finally{restoringBrowser=false;}
  }

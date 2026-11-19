@@ -26,7 +26,7 @@ public partial class App : Application
         if(test)ShutdownMode=ShutdownMode.OnExplicitShutdown;
         Directory.CreateDirectory(State.Home);
         StartupWindow? splash=null;if(!test||e.Args.Contains("--with-splash")){splash=new StartupWindow();MainWindow=splash;splash.Show();await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Render);await System.Threading.Tasks.Task.Run(()=>{State.BootSettings=State.Read<Settings>("settings.json");State.BootFolders=State.Read<System.Collections.Generic.Dictionary<string,Folder>>("index.json");});splash.SetReducedMotion(State.BootSettings?.ReduceMotion==true,State.BootSettings?.Sakura??true,State.BootSettings?.SakuraStrength??.65);splash.SetStatus("正在整理分类与封面…");}
-        var window = new MainWindow(test);State.BootFolders=null; MainWindow=window;
+        var window = new MainWindow(test,startupProbe);State.BootFolders=null; MainWindow=window;
         if(!test)
         {
             ShutdownMode=ShutdownMode.OnMainWindowClose;

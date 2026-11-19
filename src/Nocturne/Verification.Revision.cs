@@ -18,9 +18,9 @@ public static partial class Verification
  {
   try
   {
-   await Delay(300);var initialPage=w.CurrentPage;var initiallyStopped=!w.engine.Playing&&w.currentTrack==null;Snapshot(w,Path.Combine(State.Home,"restart-home.png"));
+   await w.CatalogReady;await w.InitialScan;await Delay(300);var initialPage=w.CurrentPage;var initiallyStopped=!w.engine.Playing&&w.currentTrack==null;Snapshot(w,Path.Combine(State.Home,"restart-home.png"));
    bool opened=resume!=null&&w.OpenTrack(resume,false);await w.SubtitleReady;if(resume!=null&&Library.VideoTypes.Contains(Path.GetExtension(resume)))opened=await w.VideoReady;await Delay(200);w.UpdateClock();
-   State.Write("startup-probe.json",new{initialPage,initiallyStopped,opened,position=w.PlaybackPosition,subtitle=w.CurrentSubtitle,roots=w.settings.Roots.Count,tracks=w.settings.Tracks.Count,overlayFont=w.overlay.DisplayFont.Source,overlaySize=w.overlay.DisplayFontSize,overlayColor=w.settings.OverlayColor,overlayLeft=w.overlay.Left,overlayTop=w.overlay.Top,manualFolders=w.settings.Organization.Count});
+   State.Write("startup-probe.json",new{initialPage,initiallyStopped,opened,position=w.PlaybackPosition,subtitle=w.CurrentSubtitle,roots=w.settings.Roots.Count,tracks=w.settings.Tracks.Count,indexedFiles=w.library.Folders.Values.Sum(f=>f.Audio.Count),filesRead=w.library.FilesEnumerated,overlayFont=w.overlay.DisplayFont.Source,overlaySize=w.overlay.DisplayFontSize,overlayColor=w.settings.OverlayColor,overlayLeft=w.overlay.Left,overlayTop=w.overlay.Top,manualFolders=w.settings.Organization.Count});
   }
   finally{w.ExitApplication();Application.Current.Shutdown();}
  }

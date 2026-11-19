@@ -31,10 +31,23 @@ public sealed class Library : IDisposable
  System.Threading.Timer? debounce;volatile bool disposed; public event Action? Changed; public int FilesEnumerated {get;private set;} public int ScanThreadId {get;private set;}
  public string CacheDiagnostics {get;private set;}="";
  public Library(){Folders=new(State.BootFolders??State.Read<Dictionary<string,Folder>>("index.json"),StringComparer.OrdinalIgnoreCase);if(!File.Exists(System.IO.Path.Combine(State.Home,"video-index-v1")))foreach(var f in Folders.Values)dirty.Add(f.Path);}
- public Task Scan(IReadOnlyList<string> roots,IProgress<string>? progress,CancellationToken token,bool force=false)=>Task.Run(()=>
+ public Task<bool> Scan(IReadOnlyList<string> roots,IProgress<string>? progress,CancellationToken token,bool force=false)=>Task.Run(()=>
  {
   ScanThreadId=Environment.CurrentManagedThreadId;var next=new Dictionary<string,Folder>(StringComparer.OrdinalIgnoreCase); var invalid=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
   lock(gate){invalid.UnionWith(dirty);dirty.Clear();} FilesEnumerated=0; int count=0,miss=0,changedStamp=0;
+  var cachedFolders=Folders;
+  void PreserveOfflineRoot(string root)
+  {
+   var pending=new Stack<string>();pending.Push(root);
+   while(pending.TryPop(out var path))
+   {
+    token.ThrowIfCancellationRequested();
+    if(cachedFolders.TryGetValue(path,out var cached)&&cached.Root==root&&next.TryAdd(path,cached))
+     foreach(var child in cached.Children)pending.Push(child);
+   }
+  }
+  try
+  {
   foreach(var root in roots)
   {
    var stack=new Stack<string>(); stack.Push(root);
@@ -43,24 +56,44 @@ public sealed class Library : IDisposable
     token.ThrowIfCancellationRequested(); var path=stack.Pop();
     try
     {
-     var di=new DirectoryInfo(path); if(!di.Exists){progress?.Report("目录不可用："+path); continue;}
+     var di=new DirectoryInfo(path); if(!di.Exists){progress?.Report("目录不可用："+path);if(path==root)PreserveOfflineRoot(root);continue;}
      if((di.Attributes&FileAttributes.ReparsePoint)!=0)continue;
      Folder folder;
-     if(!force&&!invalid.Contains(path)&&Folders.TryGetValue(path,out var old)&&old.Stamp==di.LastWriteTimeUtc.Ticks&&old.Root==root)folder=old;
+     if(!force&&!invalid.Contains(path)&&cachedFolders.TryGetValue(path,out var old)&&old.Stamp==di.LastWriteTimeUtc.Ticks&&old.Root==root&&(old.Subtitles.Count==0||old.SubtitleLinks.Count>0))folder=old;
      else
      {
-      miss++;if(Folders.TryGetValue(path,out var previous)&&previous.Stamp!=di.LastWriteTimeUtc.Ticks)changedStamp++;
+      miss++;if(cachedFolders.TryGetValue(path,out var previous)&&previous.Stamp!=di.LastWriteTimeUtc.Ticks)changedStamp++;
       folder=new Folder{Path=path,Root=root,Stamp=di.LastWriteTimeUtc.Ticks};
       foreach(var file in di.EnumerateFiles()){token.ThrowIfCancellationRequested();FilesEnumerated++;var ext=file.Extension;if(AudioTypes.Contains(ext)||VideoTypes.Contains(ext))folder.Audio.Add(file.FullName);else if(ImageTypes.Contains(ext))folder.Images.Add(file.FullName);else if(ext.Equals(".lrc",StringComparison.OrdinalIgnoreCase)||ext.Equals(".vtt",StringComparison.OrdinalIgnoreCase))folder.Subtitles.Add(file.FullName);}
       folder.Children=di.EnumerateDirectories().Where(x=>(x.Attributes&FileAttributes.ReparsePoint)==0).Select(x=>x.FullName).ToList();
-      folder.Audio.Sort(Natural.Instance);folder.Images.Sort(Natural.Instance);folder.Subtitles.Sort(Natural.Instance);folder.Children.Sort(Natural.Instance);
+      folder.Audio.Sort(Natural.Instance);folder.Images.Sort(Natural.Instance);folder.Subtitles.Sort(Natural.Instance);folder.Children.Sort(Natural.Instance);folder.LinkSubtitles();
      }
-     folder.LinkSubtitles();next[path]=folder; foreach(var child in folder.Children)stack.Push(child);
+     next[path]=folder; foreach(var child in folder.Children)stack.Push(child);
      if(++count%30==0)progress?.Report($"扫描 {count} 个文件夹 · {System.IO.Path.GetFileName(path)}");
-    }catch(Exception ex) when(ex is IOException or UnauthorizedAccessException){progress?.Report("无法读取："+path); if(Folders.TryGetValue(path,out var cached))next[path]=cached;}
+    }catch(Exception ex) when(ex is IOException or UnauthorizedAccessException)
+    {
+     progress?.Report("无法读取："+path);
+     if(cachedFolders.TryGetValue(path,out var cached)&&cached.Root==root)
+     {
+      next[path]=cached;
+      foreach(var child in cached.Children)stack.Push(child);
+     }
+    }
    }
   }
-  CacheDiagnostics=$"force={force}; dirty={invalid.Count}; misses={miss}; changed stamps={changedStamp}";Folders=next;State.Write("index.json",next);File.WriteAllText(System.IO.Path.Combine(State.Home,"video-index-v1"),"1");
+  token.ThrowIfCancellationRequested();
+  var changed=next.Count!=cachedFolders.Count||next.Any(pair=>!cachedFolders.TryGetValue(pair.Key,out var cached)||!ReferenceEquals(pair.Value,cached));
+  var marker=System.IO.Path.Combine(State.Home,"video-index-v1");
+  if(changed||!File.Exists(marker)){State.Write("index.json",next);File.WriteAllText(marker,"1");}
+  if(changed)Folders=next;
+  CacheDiagnostics=$"force={force}; dirty={invalid.Count}; misses={miss}; changed stamps={changedStamp}; changed={changed}";
+  return changed;
+  }
+  catch
+  {
+   lock(gate)dirty.UnionWith(invalid);
+   throw;
+  }
  },token);
  public void Watch(IEnumerable<string> roots)
  {

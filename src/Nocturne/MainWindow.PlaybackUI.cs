@@ -15,6 +15,7 @@ public partial class MainWindow
  {
   var descriptor=DependencyPropertyDescriptor.FromProperty(TextBlock.TextProperty,typeof(TextBlock));
   descriptor.AddValueChanged(Status,FeedbackChanged);
+  PlayerSurface.SizeChanged+=(_,e)=>LoopChoice.Width=e.NewSize.Width>=990?156:104;
   feedbackTimer.Tick+=(_,_)=>{feedbackTimer.Stop();if(!scanRunning)StatusSurface.Visibility=Visibility.Collapsed;};
   Closing+=(_,_)=>{feedbackTimer.Stop();descriptor.RemoveValueChanged(Status,FeedbackChanged);};
   UpdateFooterSubtitle();UpdateOverlayButtons();

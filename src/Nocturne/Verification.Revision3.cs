@@ -19,7 +19,15 @@ public static partial class Verification
  static IEnumerable<T> Visuals<T>(DependencyObject p) where T:DependencyObject{for(int i=0;i<VisualTreeHelper.GetChildrenCount(p);i++){var c=VisualTreeHelper.GetChild(p,i);if(c is T typed)yield return typed;foreach(var inner in Visuals<T>(c))yield return inner;}}
  static IEnumerable<GlyphRun> Glyphs(Drawing? drawing){if(drawing is GlyphRunDrawing glyph)yield return glyph.GlyphRun;if(drawing is DrawingGroup group)foreach(var child in group.Children)foreach(var g in Glyphs(child))yield return g;}
  static readonly List<object> clickPoints=new();
- static async Task ClickElement(FrameworkElement e){var window=Window.GetWindow(e)!;var handle=new WindowInteropHelper(window).Handle;if(!NativeProbe.TargetTestWindow(handle))throw new InvalidOperationException("原生点击的测试窗口未获得焦点。");await Delay(40);var p=e.PointToScreen(new Point(Math.Min(30,e.ActualWidth/2),Math.Max(8,e.ActualHeight/2)));if(!NativeProbe.PointTargets(handle,(int)p.X,(int)p.Y))throw new InvalidOperationException("测试窗口被遮挡，原生点击无效。");clickPoints.Add(new{pointX=p.X,pointY=p.Y,height=e.ActualHeight,type=e.GetType().Name});NativeProbe.ClickAt((int)p.X,(int)p.Y);await Delay(100);}
+ static async Task ClickElement(FrameworkElement e)
+ {
+  var window=Window.GetWindow(e)!;var handle=new WindowInteropHelper(window).Handle;
+  if(!NativeProbe.TargetTestWindow(handle))throw new InvalidOperationException("原生点击的测试窗口未获得焦点。");
+  await Delay(40);var p=e.PointToScreen(new Point(e.ActualWidth/2,e.ActualHeight/2));
+  NativeProbe.SetCursorPos((int)p.X,(int)p.Y);await Delay(40);
+  if(!NativeProbe.PointTargets(handle,(int)p.X,(int)p.Y))throw new InvalidOperationException("测试窗口被遮挡，原生点击无效。");
+  clickPoints.Add(new{pointX=p.X,pointY=p.Y,height=e.ActualHeight,type=e.GetType().Name});NativeProbe.Mouse(2);try{await Delay(35);}finally{NativeProbe.Mouse(4);}await Delay(100);
+ }
  static async Task VerifyRevision3(MainWindow w)
  {
   var root=Path.Combine(State.Home,"v13 中文 日本語 & 多.句点");var work=Path.Combine(root,"作品夜空");Directory.CreateDirectory(work);
@@ -64,7 +72,7 @@ public static partial class Verification
   SmoothScroll.Trace=null;State.Write("scroll-input-trace.json",trace);double P(List<double> values,double p)=>values.Count==0?0:values.Order().ElementAt(Math.Min(values.Count-1,(int)(values.Count*p)));
   State.Write("scroll-performance.json",new{works=w.works.Count,visibleRows,before,down,precision,reverse,frameCount=frames.Count,frameMedianMs=P(frames,.5),frameP95Ms=P(frames,.95),frameMaxMs=frames.DefaultIfEmpty().Max(),uiP95Ms=P(gaps,.95),uiMaxMs=gaps.DefaultIfEmpty().Max(),coverCache=CoverView.Cache.Count,coverDecodes=CoverView.Cache.Decodes,coverDecodeThread=CoverView.Cache.DecodeThread,uiThread=Environment.CurrentManagedThreadId});
   Check("系统滚轮精细增量反向滚动无动画积压",down>before+300&&precision>down&&reverse<precision&&!SmoothScroll.Running(w.WorksList),$"offsets={before:F1}/{down:F1}/{precision:F1}/{reverse:F1}");Check("滚动不重建列表封面后台解码有界",w.HomeRebuilds==rebuilds&&CoverView.Cache.Count<=24&&CoverView.Cache.DecodeThread!=Environment.CurrentManagedThreadId,$"rebuild delta={w.HomeRebuilds-rebuilds}; cache={CoverView.Cache.Count}; UI p95={P(gaps,.95):F1}ms; frame p95={P(frames,.95):F1}ms");
-  var keep=scroll.VerticalOffset;w.SelectWork(w.works[0]);w.Navigate("home");await w.RenderHome();await Delay(150);Check("进分类返回不重置滚动位置",Math.Abs(scroll.VerticalOffset-keep)<2);var paints=CoverView.Paints;var decodes=CoverView.Cache.Decodes;await Delay(600);Check("星空不重复绘制或解码分类封面",CoverView.Paints==paints&&CoverView.Cache.Decodes==decodes,$"paint delta={CoverView.Paints-paints}; decode delta={CoverView.Cache.Decodes-decodes}");
+  var keep=scroll.VerticalOffset;w.SelectWork(w.works[0]);await w.ReturnBrowse();await Delay(480);Check("进分类返回不重置滚动位置",Math.Abs(scroll.VerticalOffset-keep)<2,$"offset={keep:F1}→{scroll.VerticalOffset:F1}");var paints=CoverView.Paints;var decodes=CoverView.Cache.Decodes;await Delay(600);Check("星空不重复绘制或解码分类封面",CoverView.Paints==paints&&CoverView.Cache.Decodes==decodes,$"paint delta={CoverView.Paints-paints}; decode delta={CoverView.Cache.Decodes-decodes}");
   var timer=Stopwatch.StartNew();await w.FilterForTest(null,"睡前","作品");await Delay(100);Check("大库搜索及标签筛选在后台完成并从顶部显示",w.ShownWorks==12&&w.HomeWorkerThread!=Environment.CurrentManagedThreadId&&scroll.VerticalOffset<2,$"elapsed ms={timer.ElapsedMilliseconds}; offset={scroll.VerticalOffset}");await w.FilterForTest(null,null);
   w.CircleChoices.SelectedItem=w.CircleChoices.Items.Cast<MainWindow.CircleOption>().Single(c=>c.Name=="风铃社");await w.HomeReady;Check("固定社团入口直接渲染社团作品",w.CircleChoices.Visibility==Visibility.Visible&&w.ShownWorks==2);
   w.TagFilterButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));Check("标签入口显示持久标签筛选",w.TagFiltersPanel.Visibility==Visibility.Visible&&w.TagFilter.Items.Cast<string>().Contains("睡前"));await w.FilterForTest(null,null);await Delay(400);Snapshot(w,Path.Combine(State.Home,"home-circles-tags.png"));

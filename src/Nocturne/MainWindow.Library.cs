@@ -21,12 +21,13 @@ public partial class MainWindow
  }
  bool lastScanSucceeded;
  readonly System.Threading.SemaphoreSlim scanGate=new(1,1);
- internal async Task Scan(bool force)
+ internal async Task<bool> Scan(bool force)
  {
-  try{await scanGate.WaitAsync(cancellation.Token);}catch(OperationCanceledException){return;}
-  try{lastScanSucceeded=false;scanRunning=true;Status.Text="正在扫描本地目录…";await library.Scan(settings.Roots.ToArray(),new Progress<string>(s=>Status.Text=s),cancellation.Token,force);if(closing)return;await BuildTree();if(library.Folders.ContainsKey(folder)){PopulateTracks();UpdatePictures();}Status.Text=$"{works.Count} 部作品 · {library.Folders.Values.Sum(x=>x.Audio.Count)} 条音轨 · 本次读取 {library.FilesEnumerated} 个文件";lastScanSucceeded=true;}
+  try{await scanGate.WaitAsync(cancellation.Token);}catch(OperationCanceledException){return false;}
+  try{lastScanSucceeded=false;scanRunning=true;Status.Text="正在扫描本地目录…";var changed=await library.Scan(settings.Roots.ToArray(),new Progress<string>(s=>Status.Text=s),cancellation.Token,force);if(closing)return false;if(changed||force){await BuildTree();if(library.Folders.ContainsKey(folder)){PopulateTracks();UpdatePictures();}}Status.Text=$"{works.Count} 部作品 · {library.Folders.Values.Sum(x=>x.Audio.Count)} 个媒体文件 · 本次读取 {library.FilesEnumerated} 个文件";lastScanSucceeded=true;return changed||force;}
   catch(OperationCanceledException){}catch(Exception ex){Status.Text="扫描失败："+ex.Message;}
   finally{scanRunning=false;FeedbackChanged(this,EventArgs.Empty);scanGate.Release();}
+  return false;
  }
  internal Task CatalogReady {get;private set;}=Task.CompletedTask;internal Task HomeReady {get;private set;}=Task.CompletedTask;
  int catalogRequest,homeRequest,catalogRevision;string? lastTrackCandidate,lastHomeSignature;string viewMode="works";bool filterLoading;
@@ -38,7 +39,13 @@ public partial class MainWindow
  async Task BuildCatalog()
  {
   var request=++catalogRequest;var snapshot=MetadataStore.Snapshot(settings);var folders=library.Folders;
-  var built=await Task.Run(()=>{var catalog=WorkCatalog.Build(folders,snapshot);var resume=snapshot.Tracks.Where(p=>p.Value.LastPlayed!=null).OrderByDescending(p=>p.Value.LastPlayed).Select(p=>p.Key).Concat(snapshot.Resume.Values.Select(r=>r.Track)).FirstOrDefault(File.Exists);var tree=Organization.Build(catalog,snapshot);return(catalog,resume,tree,snapshot);});
+  var built=await Task.Run(()=>
+  {
+   var catalog=WorkCatalog.Build(folders,snapshot);
+   bool CanResume(string path)=>snapshot.Roots.Any(root=>WorkCatalog.Within(path,root))&&Path.GetDirectoryName(path) is string directory&&folders.TryGetValue(directory,out var indexed)&&indexed.Audio.Contains(path,StringComparer.OrdinalIgnoreCase)&&File.Exists(path);
+   var resume=snapshot.Tracks.Where(p=>p.Value.LastPlayed!=null).OrderByDescending(p=>p.Value.LastPlayed).Select(p=>p.Key).Concat(snapshot.Resume.Values.Select(r=>r.Track)).FirstOrDefault(CanResume);
+   return(catalog,resume,tree:Organization.Build(catalog,snapshot),snapshot);
+  });
   if(closing||request!=catalogRequest)return;foreach(var p in built.snapshot.WorkDetails)settings.WorkDetails.TryAdd(p.Key,p.Value);foreach(var p in built.snapshot.WorkCovers)settings.WorkCovers.TryAdd(p.Key,p.Value);foreach(var p in built.snapshot.WorkLocations)settings.WorkLocations.TryAdd(p.Key,p.Value);works=built.catalog;organization=built.tree;if(browserFolder.Length>0&&!organization.Folders.ContainsKey(browserFolder))browserFolder="";await RefreshOrganization();if(closing||request!=catalogRequest)return;catalogRevision++;lastTrackCandidate=built.resume;RefreshFilterChoices();await RenderHome();
   if(currentWork!=null){currentWork=works.FirstOrDefault(x=>x.Path==currentWork.Path);if(currentWork!=null)PopulateGroups();}
  }
@@ -53,21 +60,50 @@ public partial class MainWindow
  internal Task RenderHome()=>HomeReady=FilterHome();
  async Task FilterHome()
  {
-  if(WorksList==null)return;var request=++homeRequest;var columns=Columns();var q=Search.Text.Trim();var circle=circleFilter;var tag=tagFilter;var mode=viewMode;var snapshot=works.Where(ModeWork).ToArray();var tree=organization;var location=browserFolder;var global=globalBrowse;
-  var signature=string.Join("\0",catalogRevision.ToString(),columns.ToString(),q,circle,tag,mode,location,global.ToString(),videoBrowse.ToString());if(signature==lastHomeSignature)return;
-  var result=await Task.Run(()=>{HomeWorkerThread=Environment.CurrentManagedThreadId;var shown=snapshot.Where(w=>(q.Length==0||MatchesBrowseQuery(w,q,tree))&&(!global||circle==null||w.Circle.Equals(circle,StringComparison.OrdinalIgnoreCase))&&(global||location.Length==0||InSeries(w,location,tree))&&(tag==null||w.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase))).ToArray();var local=global?shown:shown.Where(w=>tree.Locations.GetValueOrDefault(w.Path)==location).ToArray();var children=global?Array.Empty<VirtualFolder>():tree.ChildFolders(location).Where(f=>shown.Any(w=>InSeries(w,f.Id,tree))).ToArray();var tiles=children.Select(f=>new BrowserTile(null,f){FolderCover=shown.FirstOrDefault(w=>InSeries(w,f.Id,tree)&&w.Cover!=null)?.Cover}).Concat(local.Select(w=>new BrowserTile(w,null))).ToArray();var rows=tiles.Chunk(columns).Select(x=>new HomeRow(x.ToList(),columns)).ToArray();var facets=(mode=="circles"?shown.GroupBy(w=>w.Circle).Select(g=>new Facet("circles",g.Key,g.Count())):shown.SelectMany(w=>w.Tags).GroupBy(t=>t).Select(g=>new Facet("tags",g.Key,g.Count()))).OrderBy(f=>f.Name,Natural.Instance).ToArray();return(shown,rows,facets,children);});
+  if(WorksList==null)return;var request=++homeRequest;var columns=Columns();var q=Search.Text.Trim();var circle=circleFilter;var tag=tagFilter;var mode=viewMode;var snapshot=works;var tree=organization;var location=browserFolder;var global=globalBrowse;var video=videoBrowse;
+  var signature=string.Join("\0",catalogRevision.ToString(),columns.ToString(),q,circle,tag,mode,location,global.ToString(),video.ToString());if(signature==lastHomeSignature)return;
+  var result=await Task.Run(()=>
+  {
+   HomeWorkerThread=Environment.CurrentManagedThreadId;
+   var hasModeWorks=false;
+   var shown=new List<Work>();var local=new List<Work>();var covers=new Dictionary<string,string?>(StringComparer.OrdinalIgnoreCase);
+   foreach(var work in snapshot)
+   {
+    if(!ModeWork(work,video))continue;
+    hasModeWorks=true;
+    if((q.Length>0&&!MatchesBrowseQuery(work,q,tree))||(global&&circle!=null&&!work.Circle.Equals(circle,StringComparison.OrdinalIgnoreCase))||(tag!=null&&!work.Tags.Contains(tag,StringComparer.OrdinalIgnoreCase)))continue;
+    if(global){shown.Add(work);local.Add(work);continue;}
+    var parent=tree.Locations.GetValueOrDefault(work.Path)??"";
+    if(parent==location){shown.Add(work);local.Add(work);continue;}
+    while(tree.Folders.TryGetValue(parent,out var current))
+    {
+     if(current.Parent==location)
+     {
+      shown.Add(work);
+      if(!covers.TryGetValue(parent,out var cover)||cover==null)covers[parent]=work.Cover;
+      break;
+     }
+     parent=current.Parent;
+    }
+   }
+   var children=global?Array.Empty<VirtualFolder>():tree.ChildFolders(location).Where(f=>covers.ContainsKey(f.Id)).ToArray();
+   var tiles=children.Select(f=>new BrowserTile(null,f){FolderCover=covers[f.Id]}).Concat(local.Select(w=>new BrowserTile(w,null)));
+   var rows=tiles.Chunk(columns).Select(x=>new HomeRow(x.ToList(),columns)).ToArray();
+   var facets=mode=="works"?Array.Empty<Facet>():(mode=="circles"?shown.GroupBy(w=>w.Circle).Select(g=>new Facet("circles",g.Key,g.Count())):shown.SelectMany(w=>w.Tags).GroupBy(t=>t).Select(g=>new Facet("tags",g.Key,g.Count()))).OrderBy(f=>f.Name,Natural.Instance).ToArray();
+   return(count:shown.Count,localCount:local.Count,rows,facets,children,hasModeWorks);
+  });
   if(closing||request!=homeRequest||location!=browserFolder||global!=globalBrowse||tree!=organization)return;
   var navKey=string.Join("\0",q,circle,tag,mode,location,global.ToString(),videoBrowse.ToString());var viewer=BrowserScroll(WorksList);
   if(homeNavigationKey!=null&&viewer!=null)homeScrollPositions[homeNavigationKey]=(viewer.VerticalOffset,Math.Max(1,homeColumns));
   while(homeScrollPositions.Count>64)homeScrollPositions.Remove(homeScrollPositions.Keys.First());
-  var restore=homeScrollPositions.GetValueOrDefault(navKey);homeNavigationKey=navKey;lastHomeSignature=signature;homeColumns=columns;ShownWorks=result.shown.Length;HomeRebuilds++;
+  var restore=homeScrollPositions.GetValueOrDefault(navKey);homeNavigationKey=navKey;lastHomeSignature=signature;homeColumns=columns;ShownWorks=result.count;HomeRebuilds++;
   // No item-source mutation occurs during wheel scrolling or background animation.
   SmoothScroll.Stop(WorksList);WorksList.ItemsSource=result.rows;FacetsList.ItemsSource=result.facets;SmoothScroll.ToTop(FacetsList);WorksList.Visibility=mode=="works"?Visibility.Visible:Visibility.Collapsed;FacetsList.Visibility=mode=="works"?Visibility.Collapsed:Visibility.Visible;
   _=Dispatcher.BeginInvoke(()=>{if(!closing&&request==homeRequest)BrowserScroll(WorksList)?.ScrollToVerticalOffset(restore.offset*Math.Max(1,restore.columns)/columns);},System.Windows.Threading.DispatcherPriority.Loaded);
   EmptyLibrary.Visibility=(mode=="works"?result.rows.Length:result.facets.Length)==0?Visibility.Visible:Visibility.Collapsed;
-  EmptyLibrary.Text=videoBrowse&&!works.Any(ModeWork)?"这里还没有视频\n\n添加包含视频的文件夹后，即可在这里查看。":settings.Roots.Count==0?"从第一段声音开始\n\n添加本地文件夹，整理属于你的音声收藏。":"没有匹配的作品或分类。\n可清除筛选条件，或添加自定义标签。";
+  EmptyLibrary.Text=video&&!result.hasModeWorks?"这里还没有视频\n\n添加包含视频的文件夹后，即可在这里查看。":settings.Roots.Count==0?"从第一段声音开始\n\n添加本地文件夹，整理属于你的音声收藏。":"没有匹配的作品或分类。\n试试清除筛选条件，或换个关键词。";
   HomeTitle.Text=mode=="tags"?"按标签浏览":global?(circle??"全部作品"):browserFolder.Length==0?"分类文件夹":tree.Folders.GetValueOrDefault(browserFolder)?.Name??"分类文件夹";HomeTitle.ToolTip=HomeTitle.Text;CommitBrowserSelection();
-  LibraryInfo.Text=$"{works.Count} 部作品  ·  "+(global?$"筛选 {result.shown.Length} 部":$"此处 {result.children.Length} 个文件夹 / {result.rows.SelectMany(r=>r.Entries).Count(t=>t.Work!=null)} 部作品")+"  ·  仅存储在本机";ImportResult.Text=works.Count==0?"还没有媒体，先点“添加音频”开始。":$"本地收藏 · {works.Count} 部作品";ContinueButton.Visibility=lastTrackCandidate!=null?Visibility.Visible:Visibility.Collapsed;
+  LibraryInfo.Text=$"{works.Count} 部作品  ·  "+(global?$"筛选 {result.count} 部":$"此处 {result.children.Length} 个文件夹 / {result.localCount} 部作品")+"  ·  仅存储在本机";ImportResult.Text=works.Count==0?"还没有媒体，先点“添加音频”开始。":$"本地收藏 · {works.Count} 部作品";ContinueButton.Visibility=lastTrackCandidate!=null?Visibility.Visible:Visibility.Collapsed;
   CurrentFilters.Text="当前筛选："+(circle==null?"全部社团":circle)+" / "+(tag==null?"全部标签":tag)+(q.Length==0?"":" / 搜索“"+q+"”");
  }
  void RefreshFilterChoices()
@@ -111,19 +147,23 @@ public partial class MainWindow
  }
  void TrackActivated(object sender,MouseButtonEventArgs e){if(Tracks.SelectedItem is FileItem file&&(currentTrack!=file.Path||!PlaybackPlaying))OpenTrack(file.Path,true);}
  void TrackKey(object sender,KeyEventArgs e){if(e.Key==Key.Enter&&Tracks.SelectedItem is FileItem file){OpenTrack(file.Path,true);e.Handled=true;}}
- string? ContinueTrack()=>lastTrackCandidate;
+ internal string? ContinueTrack()=>lastTrackCandidate;
  void ContinueListening(object sender,RoutedEventArgs e){var path=ContinueTrack();if(path!=null)OpenTrack(path,true);else Status.Text="请选择作品中的一条音轨。";}
  void ManageRoots(object sender,RoutedEventArgs e)
  {
   var dialog=DialogShell.Create("媒体目录",620,420);var panel=new StackPanel{Margin=new Thickness(24)};dialog.Content=panel;panel.Children.Add(new TextBlock{Text="管理本地媒体目录",FontSize=22,Margin=new Thickness(0,0,0,18)});
   var list=new ListBox{ItemsSource=settings.Roots.ToList(),Height=180};panel.Children.Add(list);var buttons=new WrapPanel();panel.Children.Add(buttons);
   var refresh=new Button{Content="刷新目录"};refresh.Click+=async(_,_)=>{dialog.Close();await Scan(true);};buttons.Children.Add(refresh);
-  var remove=new Button{Content="移除选中目录"};remove.Click+=(_,_)=>{if(list.SelectedItem is string root){RemoveMediaRoot(root);list.ItemsSource=settings.Roots.ToList();}};buttons.Children.Add(remove);
+  var remove=new Button{Content="移除选中目录"};remove.Click+=async(_,_)=>{if(list.SelectedItem is string root){var removed=RemoveMediaRoot(root);list.ItemsSource=settings.Roots.ToList();await removed;}};buttons.Children.Add(remove);
   var done=new Button{Content="完成"};done.Click+=(_,_)=>dialog.Close();buttons.Children.Add(done);dialog.Owner=this;dialog.ShowDialog();
  }
- internal void RemoveMediaRoot(string root)
+ internal async Task RemoveMediaRoot(string root)
  {
-  settings.Roots.RemoveAll(x=>x.Equals(root,StringComparison.OrdinalIgnoreCase));library.Watch(settings.Roots);_ = BuildTree();if(WorkCatalog.Within(folder,root)){folder="";currentWork=null;Tracks.ItemsSource=null;pictures.Clear();Picture.Source=PicturePrevious.Source=Backdrop.Source=null;NoPicture.Visibility=Visibility.Visible;Navigate("home");}Save();
+  settings.Roots.RemoveAll(x=>x.Equals(root,StringComparison.OrdinalIgnoreCase));library.Watch(settings.Roots);
+  if(lastTrackCandidate!=null&&WorkCatalog.Within(lastTrackCandidate,root)){lastTrackCandidate=null;ContinueButton.Visibility=Visibility.Collapsed;}
+  if(WorkCatalog.Within(folder,root)){folder="";currentWork=null;Tracks.ItemsSource=null;pictures.Clear();Picture.Source=PicturePrevious.Source=Backdrop.Source=null;NoPicture.Visibility=Visibility.Visible;Navigate("home");}
+  Save();var refreshed=await Scan(false);
+  if(!closing&&!refreshed)await BuildTree();
  }
  async void EditWork(object sender,RoutedEventArgs e){if(currentWork==null)return;var window=new WorkEditor(currentWork,works,library,settings){Owner=this};if(window.ShowDialog()==true){var oldFolder=folder;await BuildTree();SelectFolder(oldFolder);Save();}}
  internal async Task AssignWork(IEnumerable<string> groups,string owner,string name){foreach(var g in groups)settings.WorkAssignments[g]=owner;settings.WorkNames[owner]=name;await BuildTree();Save();}

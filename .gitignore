@@ -42,5 +42,6 @@ video-index-v1
 /backups/
 /docs/*
 !/docs/usage.md
+!/docs/audit-1.14.md
 !/docs/images/
 /src/Nocturne/Assets/Startup/

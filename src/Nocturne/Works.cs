@@ -68,8 +68,7 @@ public static class WorkCatalog
   {
    MetadataStore.Inherit(work.Path,work.Groups[0].Root,settings);
    work.Groups.Sort((a,b)=>Natural.Instance.Compare(a.Path,b.Path));
-   work.Images.AddRange(ImageDiscovery.Read(work.Path));
-   work.Images=work.Images.Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x=>System.IO.Path.GetFileName(x),Natural.Instance).ThenBy(x=>x,Natural.Instance).ToList();
+   work.Images=work.Images.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x=>System.IO.Path.GetFileName(x),Natural.Instance).ThenBy(x=>x,Natural.Instance).ToList();
    if(!settings.WorkCovers.ContainsKey(work.Path))
    {
     var legacy=settings.Covers.Where(x=>x.Key.Equals(work.Path,StringComparison.OrdinalIgnoreCase)||work.Groups.Any(g=>g.Path.Equals(x.Key,StringComparison.OrdinalIgnoreCase))).Select(x=>x.Value).FirstOrDefault(File.Exists);
