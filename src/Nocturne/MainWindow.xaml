@@ -1,0 +1,591 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:local="clr-namespace:Nocturne" xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="Nocturne.MainWindow" Title="{x:Static local:Brand.Name}" Icon="{x:Static local:Brand.Artwork}" BorderBrush="{StaticResource PanelStroke}" BorderThickness="1" Width="1180" Height="800" MinWidth="820" MinHeight="680" WindowStartupLocation="Manual" WindowStyle="None" Background="#0C1120" Foreground="{StaticResource Ink}" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" FontFamily="Microsoft YaHei UI, Yu Gothic UI, Segoe UI">
+ <shell:WindowChrome.WindowChrome>
+  <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6" CornerRadius="16" GlassFrameThickness="0" />
+ </shell:WindowChrome.WindowChrome>
+ <Grid>
+  <Grid.Background>
+   <RadialGradientBrush Center="0.7,0.1" GradientOrigin="0.7,0.1" RadiusX="0.9" RadiusY="1.1">
+    <GradientStop Color="#22243E" Offset="0" />
+    <GradientStop Color="#0C1221" Offset="0.7" />
+    <GradientStop Color="#0A1020" Offset="1" />
+   </RadialGradientBrush>
+  </Grid.Background>
+  <local:StarField x:Name="Stars" />
+  <Grid x:Name="MainLayout" Margin="24,6,24,16">
+   <Grid.RowDefinitions>
+    <RowDefinition Height="44" />
+    <RowDefinition x:Name="NavigationRow" Height="0" />
+    <RowDefinition Height="*" />
+    <RowDefinition x:Name="PlayerBarRow" Height="162" />
+   </Grid.RowDefinitions>
+   <Grid>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+     <Image Source="{x:Static local:Brand.Artwork}" Width="30" Height="30" />
+     <TextBlock Text="{x:Static local:Brand.Name}" FontSize="18" FontWeight="Medium" Margin="12,0,0,0" />
+     <TextBlock Text="LOCAL AUDIO" Foreground="{StaticResource Muted}" FontSize="10" Margin="15,6,0,0" />
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+     <Button x:Name="AddFolderButton" MinWidth="114" Height="34" MinHeight="34" Padding="12,6" Click="AddRoot" ToolTip="选择媒体文件夹并导入" AutomationProperties.Name="添加文件夹"><StackPanel Orientation="Horizontal"><local:Symbol Kind="Folder" Width="17" Height="17"/><TextBlock Text="添加文件夹" Margin="7,0,0,0" FontSize="13" VerticalAlignment="Center"/></StackPanel></Button>
+     <Button Style="{StaticResource IconButton}" Height="32" MinHeight="28" Click="OpenSettings" ToolTip="设置" AutomationProperties.Name="设置"><local:Symbol Kind="Settings" Width="16" Height="16"/></Button><Button Style="{StaticResource IconButton}" Height="32" MinHeight="28" ToolTip="最小化" AutomationProperties.Name="最小化" Click="MinimizeWindow">
+      <local:Symbol Kind="Minus" Width="15" Height="15" />
+     </Button>
+     <Button Style="{StaticResource IconButton}" Height="32" MinHeight="28" ToolTip="最大化或还原" AutomationProperties.Name="最大化或还原" Click="MaximizeWindow">
+      <local:Symbol Kind="Maximize" Width="13" Height="13" />
+     </Button>
+     <Button Style="{StaticResource IconButton}" Height="32" MinHeight="28" x:Name="CloseWindowButton" ToolTip="关闭窗口" AutomationProperties.Name="关闭窗口" Click="CloseWindow">
+      <local:Symbol Kind="Close" Width="16" Height="16" />
+     </Button>
+    </StackPanel>
+   </Grid>
+   <Grid x:Name="NavigationBar" Grid.Row="1" Visibility="Collapsed">
+    <Grid.ColumnDefinitions>
+     <ColumnDefinition Width="*" />
+     <ColumnDefinition Width="12" />
+     <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+    <Grid VerticalAlignment="Center">
+     <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="*" />
+     </Grid.ColumnDefinitions>
+     <Button Click="GoHome" ToolTip="返回功能主页">
+      <StackPanel Orientation="Horizontal">
+       <local:Symbol Kind="Home" Width="17" Height="17" />
+       <TextBlock Text="主页" Margin="8,0,0,0" />
+      </StackPanel>
+     </Button>
+     <Grid Grid.Column="1" HorizontalAlignment="Left" Width="230" MaxWidth="230" MinWidth="90" Margin="12,3,0,3">
+      <TextBox x:Name="Search" ToolTip="搜索社团、系列、作品或音轨" AutomationProperties.Name="搜索社团、系列、作品或音轨" TextChanged="SearchChanged" VerticalContentAlignment="Center" />
+      <TextBlock Text="搜索社团、系列、作品或音轨" Foreground="{StaticResource Muted}" IsHitTestVisible="False" Margin="14,0" VerticalAlignment="Center" FontSize="12">
+       <TextBlock.Style>
+        <Style TargetType="TextBlock">
+         <Setter Property="Visibility" Value="Collapsed" />
+         <Style.Triggers>
+          <DataTrigger Binding="{Binding Text, ElementName=Search}" Value="">
+           <Setter Property="Visibility" Value="Visible" />
+          </DataTrigger>
+         </Style.Triggers>
+        </Style>
+       </TextBlock.Style>
+      </TextBlock>
+     </Grid>
+    </Grid>
+    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+     <Button Click="ChooseVideo" ToolTip="选择直接播放或静音配套视频">
+      <StackPanel Orientation="Horizontal">
+       <local:Symbol Kind="Play" Width="15" Height="15" />
+       <TextBlock Text="视频" Margin="6,0,0,0" />
+      </StackPanel>
+     </Button>
+     <Button Style="{StaticResource IconButton}" Click="ManageRoots" ToolTip="媒体目录管理" AutomationProperties.Name="媒体目录管理">
+      <local:Symbol Kind="Refresh" />
+     </Button>
+     <Button Style="{StaticResource IconButton}" Click="OpenSettings" ToolTip="设置" AutomationProperties.Name="设置">
+      <local:Symbol Kind="Settings" />
+     </Button>
+    </StackPanel>
+   </Grid>
+   <Grid x:Name="PageContentHost" SizeChanged="ChromeViewportChanged" Grid.Row="2" Margin="4,20,4,16"><Grid x:Name="LandingPage"><StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="1050">
+ <TextBlock x:Name="WelcomeTitle" Text="欢迎来到月咲 Shion" FontSize="40" FontWeight="SemiBold" Foreground="{StaticResource WelcomeInk}" HorizontalAlignment="Center"/>
+ <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"><Border Width="190" Height="1" Background="{StaticResource WelcomeInk}" VerticalAlignment="Center"/><TextBlock Text="✦" FontSize="15" Margin="8,0" Foreground="{StaticResource Accent}"/><TextBlock Text="✿" FontSize="13" Opacity="0.65" Foreground="{StaticResource Accent}"/></StackPanel>
+ <TextBlock Text="让声音，在夜里轻轻盛开。" Foreground="{StaticResource Muted}" FontSize="16" HorizontalAlignment="Center" Margin="0,18,0,46"/>
+ <WrapPanel HorizontalAlignment="Center">
+ <Button x:Name="HomeAdd" Style="{StaticResource HomeEntry}" Width="250" Click="ImportChoice" ToolTip="导入本地文件与文件夹"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><local:Symbol Kind="Plus" Width="29" Height="29" Foreground="{StaticResource Accent}"/><StackPanel Grid.Column="1" Margin="12,0,0,0"><TextBlock Text="添加音频" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="导入本地文件与文件夹" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,0"/></StackPanel></Grid></Button>
+ <Button x:Name="HomeListen" Style="{StaticResource HomeEntry}" Width="250" Click="BrowseAudioMode" ToolTip="按社团与系列，找到想听的作品"><Button.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#B85D4C80" Offset="0"/><GradientStop Color="#98574464" Offset="1"/></LinearGradientBrush></Button.Background><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><local:Symbol Kind="Moon" Width="29" Height="29" Foreground="{StaticResource Accent}"/><StackPanel Grid.Column="1" Margin="12,0,0,0"><TextBlock Text="听音频" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="按社团与系列，找到想听的作品" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,0"/></StackPanel></Grid></Button>
+ <Button x:Name="HomeVideo" Style="{StaticResource HomeEntry}" Width="250" Click="BrowseVideoMode" ToolTip="浏览本地视频作品"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><local:Symbol Kind="Play" Width="29" Height="29" Foreground="{StaticResource Accent}"/><StackPanel Grid.Column="1" Margin="12,0,0,0"><TextBlock Text="看视频" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="浏览本地视频作品" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,10,0,0"/></StackPanel></Grid></Button>
+ </WrapPanel><TextBlock x:Name="ImportResult" Margin="12,26" TextAlignment="Center" Foreground="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="680"/>
+ </StackPanel></Grid>    <Grid x:Name="HomePage" Visibility="Collapsed">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+     </Grid.RowDefinitions>
+     <StackPanel Margin="8,0,0,8">
+      <DockPanel>
+       <Button x:Name="ContinueButton" Content="继续收听 →" Visibility="Collapsed" Click="ContinueListening" DockPanel.Dock="Right" />
+       <TextBlock x:Name="HomeTitle" Text="选择今晚的声音" FontSize="24" FontWeight="SemiBold" LineHeight="32" MaxHeight="64" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+      <DockPanel Margin="0,2,0,0">
+       <TextBlock x:Name="LibraryInfo" FontSize="11" Text="本地收藏，在星光下慢慢听。" Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
+      </DockPanel>
+      <WrapPanel>
+       <Button x:Name="TagFilterButton" Content="标签筛选" Click="ToggleTagFilters" />
+       <Button Content="整理 ⋯" Click="ShowOrganizationMenu">
+        <Button.ContextMenu>
+         <ContextMenu>
+          <MenuItem Header="整理分类文件夹" Click="EditOrganization" />
+          <MenuItem Header="社团与标签" Click="EditMetadata" />
+          <MenuItem Header="文件夹层级浏览" Click="BrowseWorks" />
+         </ContextMenu>
+        </Button.ContextMenu>
+       </Button>
+      </WrapPanel>
+      <WrapPanel x:Name="TagFiltersPanel" Visibility="Collapsed" Margin="0,2,0,0">
+       <ComboBox x:Name="TagFilter" Width="180" SelectionChanged="FilterChanged" ToolTip="标签筛选" />
+       <Button Content="清除筛选" Click="ClearFilters" />
+       <ComboBox x:Name="CircleFilter" Width="128" SelectionChanged="FilterChanged" ToolTip="社团筛选" Visibility="Collapsed" />
+      </WrapPanel>
+      <DockPanel Margin="0,5,0,0">
+       <Button Style="{StaticResource IconButton}" Click="ParentFolder" ToolTip="返回上一级" AutomationProperties.Name="返回上一级文件夹" Width="32" Height="32" MinHeight="28" Padding="7">
+        <local:Symbol Kind="Back" />
+       </Button>
+       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Height="38" x:Name="FolderBreadcrumbBar" Visibility="Collapsed">
+        <ItemsControl x:Name="Breadcrumb">
+         <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+           <StackPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+         </ItemsControl.ItemsPanel>
+        </ItemsControl>
+       </ScrollViewer>
+      </DockPanel>
+      <TextBlock x:Name="CurrentFilters" FontSize="10" Foreground="{StaticResource Muted}" Margin="10,2,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+     </StackPanel>
+     <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition x:Name="BrowserSidebar" Width="252" />
+       <ColumnDefinition Width="16" />
+       <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Border CornerRadius="20" Background="#80131C30" Padding="6">
+       <Grid x:Name="CircleSidebar">
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="6,6,6,10">
+         <TextBlock Text="社团" Margin="8,0,0,10" FontSize="17" FontWeight="SemiBold" />
+         <Grid><TextBox x:Name="CircleSearch" TextChanged="CircleSearchChanged" FontSize="14" Padding="12,9" ToolTip="搜索社团名称" AutomationProperties.Name="搜索社团"/><TextBlock Text="搜索社团" FontSize="13" Foreground="{StaticResource Muted}" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text,ElementName=CircleSearch}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid>
+        </StackPanel>
+        <Grid x:Name="BrowserSidebarBody" Grid.Row="1">
+         <ListBox x:Name="CircleChoices" SelectedValuePath="Id" PreviewMouseLeftButtonDown="CircleMouseDown" SelectionChanged="CircleSelected" ItemContainerStyle="{StaticResource CircleRow}" local:SmoothScroll.Enabled="True" ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+           <DataTemplate>
+            <Grid>
+             <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+             </Grid.ColumnDefinitions>
+             <TextBlock Text="{Binding Label}" ToolTip="{Binding Label}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" LineHeight="24" MaxHeight="48" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+             <TextBlock Grid.Column="1" Text="{Binding Count}" Margin="8,0,0,0" FontSize="12" Foreground="{StaticResource Accent}" VerticalAlignment="Center" />
+            </Grid>
+           </DataTemplate>
+          </ListBox.ItemTemplate>
+         </ListBox>
+         <ListBox x:Name="FolderTree" local:SmoothScroll.Enabled="True" ItemContainerStyle="{StaticResource PlainRow}" ScrollViewer.VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+          <ListBox.ItemTemplate>
+           <DataTemplate>
+            <Grid Height="42" Margin="{Binding Indent}">
+             <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="28" />
+              <ColumnDefinition Width="*" />
+             </Grid.ColumnDefinitions>
+             <Button Content="{Binding Arrow}" Tag="{Binding}" Click="ToggleFolder" Padding="4" MinHeight="28" ToolTip="展开或折叠" />
+             <Button Grid.Column="1" Tag="{Binding}" Click="TreeOpen" Padding="4" HorizontalContentAlignment="Stretch">
+              <Button.ContextMenu>
+               <ContextMenu>
+                <MenuItem Header="查看完整名称" Click="ShowFullName" />
+               </ContextMenu>
+              </Button.ContextMenu>
+              <Grid>
+               <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+               </Grid.ColumnDefinitions>
+               <local:Symbol Kind="{Binding Icon}" Width="15" Height="15" Foreground="{StaticResource Accent}" />
+               <TextBlock Grid.Column="1" Text="{Binding Name}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" FontSize="12" VerticalAlignment="Center" />
+              </Grid>
+             </Button>
+            </Grid>
+           </DataTemplate>
+          </ListBox.ItemTemplate>
+         </ListBox>
+        </Grid>
+       </Grid>
+      </Border>
+      <ListBox SizeChanged="WorksViewportChanged" x:Name="WorksList" Grid.Column="2" ItemContainerStyle="{StaticResource HomeRowStyle}" local:SmoothScroll.Enabled="True" ScrollViewer.VerticalScrollBarVisibility="Auto">
+       <ListBox.ItemTemplate>
+        <DataTemplate>
+         <ItemsControl ItemsSource="{Binding Entries}">
+          <ItemsControl.ItemsPanel>
+           <ItemsPanelTemplate>
+            <UniformGrid Rows="1" Columns="{Binding Columns}" />
+           </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+           <DataTemplate>
+            <Button Style="{StaticResource TileButton}" Tag="{Binding}" Click="OpenWork" AutomationProperties.Name="{Binding Name}">
+             <Button.ContextMenu>
+              <ContextMenu>
+               <MenuItem Header="查看完整名称" Click="ShowFullName" />
+              </ContextMenu>
+             </Button.ContextMenu>
+             <Grid>
+              <Grid.RowDefinitions>
+               <RowDefinition Height="180" />
+               <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <local:CoverView Path="{Binding Cover}"  />
+              <Border CornerRadius="20" Background="#30212C47" Visibility="{Binding FolderVisibility}">
+               <local:Symbol Kind="Folder" Width="62" Height="62" Foreground="{StaticResource Accent}" />
+              </Border>
+              <StackPanel Grid.Row="1" Margin="3,10,3,12">
+               <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" FontSize="16" FontWeight="SemiBold" LineHeight="26" LineStackingStrategy="BlockLineHeight" MaxHeight="78" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
+               <TextBlock Text="{Binding HomeInfo}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,6,0,0" />
+              </StackPanel>
+             </Grid>
+            </Button>
+           </DataTemplate>
+          </ItemsControl.ItemTemplate>
+         </ItemsControl>
+        </DataTemplate>
+       </ListBox.ItemTemplate>
+      </ListBox>
+      <ListBox x:Name="FacetsList" Grid.Column="2" Visibility="Collapsed" local:SmoothScroll.Enabled="True">
+       <ListBox.ItemTemplate>
+        <DataTemplate>
+         <Button Content="{Binding Label}" Tag="{Binding}" Click="SelectFacet" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+        </DataTemplate>
+       </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock x:Name="EmptyLibrary" Grid.Column="2" Text="把喜欢的声音，留在这里。&#10;&#10;添加本地媒体目录，开始整理你的收藏。" Foreground="{StaticResource Muted}" FontSize="16" TextAlignment="Center" VerticalAlignment="Center" LineHeight="30" />
+     </Grid>
+    </Grid>
+    <Grid x:Name="DetailPage" Visibility="Collapsed">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+     </Grid.RowDefinitions>
+     <Grid Margin="0,0,0,18">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="Auto" />
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Button Style="{StaticResource IconButton}" Click="BrowseBack" ToolTip="返回分类" AutomationProperties.Name="返回分类">
+       <local:Symbol Kind="Back" />
+      </Button>
+      <StackPanel Grid.Column="1" Margin="13,0">
+       <TextBlock x:Name="WorkTitle" FontSize="23" FontWeight="SemiBold" LineHeight="32" MaxHeight="64" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
+       <TextBlock x:Name="WorkPath" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+      </StackPanel>
+      <Button Grid.Column="2" Content="调整分类" Click="EditWork" VerticalAlignment="Center" />
+     </Grid>
+     <ListBox x:Name="GroupList" Grid.Row="1" SelectionChanged="GroupSelected" Margin="0,0,0,16" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+      <ListBox.ItemsPanel>
+       <ItemsPanelTemplate>
+        <VirtualizingStackPanel Orientation="Horizontal" />
+       </ItemsPanelTemplate>
+      </ListBox.ItemsPanel>
+      <ListBox.ItemTemplate>
+       <DataTemplate>
+        <TextBlock Text="{Binding Name}" />
+       </DataTemplate>
+      </ListBox.ItemTemplate>
+     </ListBox>
+     <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="1.1*" />
+       <ColumnDefinition Width="24" />
+       <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid>
+       <Grid.RowDefinitions>
+        <RowDefinition Height="28" />
+        <RowDefinition Height="*" />
+       </Grid.RowDefinitions>
+       <TextBlock Text="音轨  /  点击收听" Foreground="{StaticResource Muted}" FontSize="11" Margin="16,0,0,0" />
+       <ListBox x:Name="Tracks" Grid.Row="1" PreviewMouseLeftButtonUp="TrackClicked" MouseDoubleClick="TrackActivated" KeyDown="TrackKey">
+        <ListBox.ItemTemplate>
+         <DataTemplate>
+          <Grid>
+           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="60" />
+           </Grid.ColumnDefinitions>
+           <StackPanel>
+            <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" LineHeight="23" MaxHeight="46" FontSize="14" />
+            <TextBlock Text="{Binding Hint}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,6,0,0" />
+           </StackPanel>
+           <TextBlock Grid.Column="1" Text="{Binding ProgressText}" Foreground="{StaticResource Accent}" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right" />
+          </Grid>
+         </DataTemplate>
+        </ListBox.ItemTemplate>
+       </ListBox>
+      </Grid>
+      <Grid Grid.Column="2">
+       <Grid.RowDefinitions>
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+       </Grid.RowDefinitions>
+       <Border CornerRadius="22" Background="#70182137" Padding="10">
+        <Grid>
+         <Image x:Name="Backdrop" Opacity="0.07" Stretch="UniformToFill" IsHitTestVisible="False" />
+         <ScrollViewer x:Name="PictureScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" SizeChanged="PictureViewportChanged">
+          <Grid>
+           <Image x:Name="PicturePrevious" Stretch="Uniform" IsHitTestVisible="False" />
+           <Image x:Name="Picture" Stretch="Uniform" />
+          </Grid>
+         </ScrollViewer>
+         <TextBlock x:Name="NoPicture" Text="暂无作品图片" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Grid>
+       </Border>
+       <StackPanel Grid.Row="1" Margin="0,10,0,0">
+        <TextBlock x:Name="ImageName" Text="作品图片" FontSize="11" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" HorizontalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
+         <Button x:Name="PreviousImageButton" Style="{StaticResource IconButton}" Click="PreviousImage" ToolTip="上一张" AutomationProperties.Name="上一张图片">
+          <local:Symbol Kind="ChevronLeft" />
+         </Button>
+         <Button x:Name="NextImageButton" Style="{StaticResource IconButton}" Click="NextImage" ToolTip="下一张" AutomationProperties.Name="下一张图片">
+          <local:Symbol Kind="ChevronRight" />
+         </Button>
+         <Button Style="{StaticResource IconButton}" Click="ZoomOut" ToolTip="缩小" AutomationProperties.Name="缩小图片">
+          <local:Symbol Kind="Minus" />
+         </Button>
+         <Button Style="{StaticResource IconButton}" Click="ZoomIn" ToolTip="放大" AutomationProperties.Name="放大图片">
+          <local:Symbol Kind="Plus" />
+         </Button>
+         <Button Style="{StaticResource IconButton}" Click="FitImage" ToolTip="适应窗口" AutomationProperties.Name="图片适应窗口">
+          <local:Symbol Kind="Fit" />
+         </Button>
+         <Button Style="{StaticResource IconButton}" Click="SetCover" ToolTip="当前图片设为分类封面" AutomationProperties.Name="设为分类封面">
+          <local:Symbol Kind="Cover" />
+         </Button>
+        </StackPanel>
+        <Button Content="从本地选择封面" Click="PickCover" HorizontalAlignment="Center" />
+       </StackPanel>
+      </Grid>
+     </Grid>
+    </Grid>
+    <Grid x:Name="LyricsPage" Visibility="Collapsed">
+     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+     </Grid.RowDefinitions>
+     <Grid Margin="0,0,0,8">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="Auto" />
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Button Style="{StaticResource MediaButton}" Click="CloseLyrics" ToolTip="返回作品 / 保留浏览位置" AutomationProperties.Name="返回作品">
+       <local:Symbol Kind="Back" />
+      </Button>
+      <StackPanel Grid.Column="1" Margin="12,0">
+       <TextBlock x:Name="LyricTrackName" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap" LineHeight="27" MaxHeight="54" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text,RelativeSource={RelativeSource Self}}" />
+       <TextBlock Text="原声与字句，慢慢靠近" Foreground="{StaticResource Muted}" FontSize="10" Margin="0,5,0,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal">
+       <Button x:Name="LyricsPicturesButton" Style="{StaticResource MediaButton}" Click="TogglePicturesPanel" ToolTip="显示 / 隐藏作品图片" AutomationProperties.Name="显示或隐藏图片">
+        <local:Symbol Kind="Cover" />
+       </Button>
+       <Button x:Name="LyricsVideoButton" Style="{StaticResource MediaButton}" Click="ToggleVideoPanel" ToolTip="显示 / 隐藏视频，右键更多操作" AutomationProperties.Name="显示或隐藏视频">
+        <Button.ContextMenu>
+         <ContextMenu Opened="VideoMenuOpened">
+          <MenuItem Header="选择视频" Click="ChooseVideo" />
+          <MenuItem Header="关闭视频并释放解码器" Click="CloseVideo" />
+          <MenuItem Header="配套视频与音频同步" IsCheckable="True" Click="ToggleVideoSyncMenu" />
+         </ContextMenu>
+        </Button.ContextMenu>
+        <local:Symbol Kind="Play" />
+       </Button>
+      </StackPanel>
+     </Grid>
+     <Grid x:Name="LyricsWorkspace" SizeChanged="MediaWorkspaceSizeChanged" Grid.Row="1" Margin="0,0,0,8" ClipToBounds="True">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition x:Name="LeftMediaColumn" Width="0" />
+       <ColumnDefinition Width="0" />
+       <ColumnDefinition x:Name="LyricsColumn" Width="*" />
+       <ColumnDefinition x:Name="VideoDividerColumn" Width="0" />
+       <ColumnDefinition x:Name="VideoColumn" Width="0" />
+      </Grid.ColumnDefinitions>
+      <Border x:Name="SubtitlePanel" CornerRadius="24" Background="#60151D31" Margin="0" Padding="8,6">
+       <Grid>
+        <ListBox local:SmoothScroll.Enabled="True" x:Name="SubtitleLines" SizeChanged="LyricsViewportChanged" RequestBringIntoView="LyricBringIntoView" ItemContainerStyle="{StaticResource LyricLine}" SelectionMode="Extended" SelectionChanged="SubtitleLineSelected" PreviewMouseLeftButtonDown="LyricDoubleClick" PreviewMouseWheel="BrowseLyrics" PreviewMouseDown="BrowseLyricsMouse" PreviewKeyDown="BrowseLyricsKey" ScrollViewer.VerticalScrollBarVisibility="Auto">
+         <ListBox.ItemTemplate>
+          <DataTemplate>
+           <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=ListBox}}" FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=ListBox}}" TextAlignment="Center" Margin="0,4" LineStackingStrategy="BlockLineHeight" LineHeight="{Binding Tag, RelativeSource={RelativeSource AncestorType=ListBox}}" />
+          </DataTemplate>
+         </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="NoLyrics" Text="未找到匹配字幕&#10;可在下方手动选择 LRC 或 VTT。" Foreground="{StaticResource Muted}" TextAlignment="Center" VerticalAlignment="Center" LineHeight="30" />
+       </Grid>
+      </Border>
+      <Border x:Name="VideoPane" Grid.Column="2" CornerRadius="22" Background="#C0131A2A" Padding="12" Visibility="Collapsed">
+       <Grid>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="Auto" />
+         <RowDefinition Height="*" />
+         <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <DockPanel>
+         <Button DockPanel.Dock="Right" Style="{StaticResource MediaButton}" Width="30" Height="30" MinHeight="26" Padding="4" Content="⋯" Click="ShowOrganizationMenu" ToolTip="视频独立控制">
+          <Button.ContextMenu><ContextMenu Opened="VideoMenuOpened"><MenuItem Header="配套视频播放 / 暂停" Click="VideoPlayPause"/><MenuItem Header="配套视频后退 5 秒" Click="CompanionBack"/><MenuItem Header="配套视频前进 5 秒" Click="CompanionForward"/><MenuItem Header="配套视频与音频同步" IsCheckable="True" Click="ToggleVideoSyncMenu"/></ContextMenu></Button.ContextMenu>
+         </Button>
+         <Button Click="VideoCaptionOptions" Content="CC" DockPanel.Dock="Right" ToolTip="视频字幕开关、字号及偏移" />
+         <Button Click="CloseVideo" Content="关闭" DockPanel.Dock="Right" ToolTip="关闭视频并释放资源，保留音频与图片" />
+         <Button Style="{StaticResource IconButton}" Click="FullscreenVideo" DockPanel.Dock="Right" ToolTip="视频全屏 / Esc 退出" AutomationProperties.Name="视频全屏">
+          <local:Symbol Kind="Maximize" />
+         </Button>
+         <TextBlock TextWrapping="NoWrap" x:Name="VideoTitle" Foreground="{StaticResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        </DockPanel>
+        <Grid x:Name="VideoViewport" Grid.Row="1" Margin="0,8" ClipToBounds="True" SizeChanged="VideoViewportChanged">
+         <Image x:Name="VideoImage" Stretch="Uniform" IsHitTestVisible="False" />
+         <TextBlock x:Name="VideoCaption" IsHitTestVisible="False" TextAlignment="Center" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12"><TextBlock.Effect><DropShadowEffect Color="Black" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/></TextBlock.Effect></TextBlock>
+        </Grid>
+        <StackPanel x:Name="VideoControlsGroup" Grid.Row="2">
+         <Grid>
+          <Grid.ColumnDefinitions>
+           <ColumnDefinition Width="Auto" />
+           <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Button x:Name="VideoToggle" Style="{StaticResource IconButton}" Click="VideoPlayPause" ToolTip="暂停配套视频" AutomationProperties.Name="暂停配套视频">
+           <local:Symbol x:Name="VideoPlayIcon" Kind="Pause" />
+          </Button>
+          <Slider x:Name="VideoSeek" IsMoveToPointEnabled="False" Grid.Column="1" PreviewMouseMove="VideoSeekMove" LostMouseCapture="VideoSeekLostCapture" ToolTip="点击或拖动配套视频进度" Minimum="0" Maximum="1" PreviewMouseLeftButtonDown="VideoSeekStart" PreviewMouseLeftButtonUp="VideoSeekEnd" PreviewKeyDown="VideoSeekKey" AutomationProperties.Name="配套视频进度" />
+         </Grid>
+         <WrapPanel>
+          <TextBlock x:Name="VideoTime" FontSize="10" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <CheckBox x:Name="VideoSync" Content="与音频同步" Checked="SyncVideo" Unchecked="SyncVideo" ToolTip="主动启用后，视频跟随音频的播放、暂停与进度" />
+         </WrapPanel>
+        </StackPanel>
+       </Grid>
+      </Border>
+      <Border x:Name="LyricsArtwork" CornerRadius="22" Background="#60182137" Padding="8" Visibility="Collapsed">
+       <Grid>
+        <Grid.RowDefinitions>
+         <RowDefinition Height="*" />
+         <RowDefinition Height="32" />
+        </Grid.RowDefinitions>
+        <Grid ClipToBounds="True">
+         <Image x:Name="LyricsPicturePrevious" Stretch="Uniform" IsHitTestVisible="False" />
+         <Image x:Name="LyricsPicture" Stretch="Uniform" />
+        </Grid>
+        <Grid Grid.Row="1">
+         <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="36" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="36" />
+         </Grid.ColumnDefinitions>
+         <Button x:Name="LyricsPreviousImage" Style="{StaticResource MediaButton}" Width="30" Height="30" MinHeight="28" Padding="6" Click="PreviousImage" ToolTip="上一张图片" AutomationProperties.Name="上一张作品图片">
+          <local:Symbol Kind="ChevronLeft" />
+         </Button>
+         <TextBlock x:Name="LyricsImageCount" Grid.Column="1" Text="1 / 1" VerticalAlignment="Center" TextAlignment="Center" Foreground="{StaticResource Ink}" FontSize="11" />
+         <Button x:Name="LyricsNextImage" Grid.Column="2" Style="{StaticResource MediaButton}" Width="30" Height="30" MinHeight="28" Padding="6" Click="NextImage" ToolTip="下一张图片" AutomationProperties.Name="下一张作品图片">
+          <local:Symbol Kind="ChevronRight" />
+         </Button>
+        </Grid>
+       </Grid>
+      </Border>
+      <GridSplitter x:Name="VideoDivider" Grid.Column="3" Width="6" HorizontalAlignment="Center" Background="#706E6489" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" DragCompleted="MediaWidthChanged" Visibility="Collapsed" />
+      <GridSplitter x:Name="LeftMediaDivider" Grid.Column="1" Width="6" HorizontalAlignment="Center" Background="#706E6489" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" DragCompleted="MediaWidthChanged" Visibility="Collapsed" />
+      <GridSplitter x:Name="CompactMediaDivider" Height="5" HorizontalAlignment="Stretch" Background="#706E6489" ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" DragCompleted="CompactHeightChanged" Visibility="Collapsed" />
+     </Grid>
+     <Border x:Name="WavePanel" Grid.Row="2" CornerRadius="18" Background="#301B2137" Padding="12,2" Margin="0,0,0,6">
+      <Grid>
+       <Grid.RowDefinitions>
+        <RowDefinition Height="0" />
+        <RowDefinition Height="Auto" />
+       </Grid.RowDefinitions>
+       <TextBlock Text="声音的微光" FontSize="10" Foreground="{StaticResource Muted}" />
+       <Grid x:Name="WaveHost" Grid.Row="1">
+        <local:AudioWave Grid.Column="1" x:Name="Wave" Height="32" Margin="6,2" HorizontalAlignment="Stretch" />
+       </Grid>
+      </Grid>
+     </Border>
+     <Grid Grid.Row="3">
+      <Grid.RowDefinitions>
+       <RowDefinition Height="Auto" />
+       <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <DockPanel>
+       <Button x:Name="FollowButton" Click="ResumeFollow" Content="恢复跟随" Padding="12,4" MinHeight="26" DockPanel.Dock="Right" />
+       <TextBlock Text="双击台词跳转" Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center" />
+      </DockPanel>
+      <WrapPanel x:Name="LyricControls" Grid.Row="1" HorizontalAlignment="Center">
+       <Button Content="选择字幕" Click="PickSubtitle" />
+       <ComboBox x:Name="SubtitleChoice" Width="180" DisplayMemberPath="Name" SelectionChanged="SubtitleChanged" />
+       <ComboBox x:Name="EncodingChoice" Width="104" SelectionChanged="EncodingChanged">
+        <ComboBoxItem Content="自动" />
+        <ComboBoxItem Content="UTF-8" />
+        <ComboBoxItem Content="GB18030" />
+        <ComboBoxItem Content="shift_jis" />
+        <ComboBoxItem Content="UTF-16" />
+       </ComboBox>
+       <Button Content="−0.1 s" Click="OffsetMinus" />
+       <TextBlock x:Name="OffsetText" Text="0.0 s" Width="54" TextAlignment="Center" VerticalAlignment="Center" />
+       <Button Content="＋0.1 s" Click="OffsetPlus" />
+      </WrapPanel>
+     </Grid>
+    </Grid>
+   </Grid>
+   <Border x:Name="PlayerSurface" Grid.Row="3" CornerRadius="23" BorderBrush="{StaticResource PanelStroke}" BorderThickness="1" Background="{StaticResource PanelInk}" Padding="20,14">
+    <Grid>
+     <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="28" />
+      <RowDefinition Height="22" />
+     </Grid.RowDefinitions>
+     <Grid>
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="Auto" />
+       <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+       <TextBlock x:Name="FooterSubtitle" Text="尚未播放" FontWeight="SemiBold" Foreground="#FFF2FC" FontSize="20" LineHeight="28" Height="56" VerticalAlignment="Center" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" ToolTipService.ShowDuration="20000" />
+       <Grid Margin="0,5,0,0">
+        <Grid.ColumnDefinitions>
+         <ColumnDefinition Width="*" />
+         <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="AudioInfo" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="从主页选择本地音频或视频" Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center" />
+       </Grid>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+       <Button Style="{StaticResource MediaButton}" x:Name="PreviousButton" Click="PreviousTrack" ToolTip="上一首" AutomationProperties.Name="上一首">
+        <local:Symbol Kind="Previous" />
+       </Button>
+       <Button Style="{StaticResource MediaButton}" x:Name="PlayButton" Click="TogglePlay" Background="#BEAD739F" Width="54" Height="50" ToolTip="播放" AutomationProperties.Name="播放">
+        <local:Symbol x:Name="PlayIcon" Kind="Play" Width="23" Height="23" />
+       </Button>
+       <Button Style="{StaticResource MediaButton}" x:Name="NextButton" Click="NextTrack" ToolTip="下一首" AutomationProperties.Name="下一首">
+        <local:Symbol Kind="Next" />
+       </Button>
+      </StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+       <ComboBox x:Name="LoopChoice" Width="100" SelectionChanged="LoopChanged">
+        <ComboBoxItem Content="顺序播放" />
+        <ComboBoxItem Content="列表循环" />
+        <ComboBoxItem Content="单曲循环" /><ComboBoxItem Content="播完当前文件夹后暂停" />
+       </ComboBox>
+       <Slider x:Name="Volume" Width="64" Minimum="0" Maximum="1" ValueChanged="VolumeChanged" ToolTip="音量" AutomationProperties.Name="音量" />
+       <TextBlock x:Name="VolumeText" Text="65%" Width="35" TextAlignment="Right" VerticalAlignment="Center" FontSize="10" Foreground="{StaticResource Muted}" />
+
+       <Button x:Name="OpenLyricsButton" Click="OpenLyrics" ToolTip="打开当前播放页面，不重新播放" AutomationProperties.Name="打开字幕页面" Padding="12,9">
+        <StackPanel Orientation="Horizontal"><local:Symbol Kind="Lyrics" Width="18"/><TextBlock Text="打开字幕" Margin="6,0,0,0" FontSize="12"/></StackPanel>
+       </Button>
+       <ToggleButton x:Name="DesktopLyricsButton" Style="{StaticResource FooterToggle}" Click="ToggleOverlay" AutomationProperties.Name="桌面字幕">
+        <StackPanel Orientation="Horizontal"><local:Symbol Kind="Overlay" Width="18"/><TextBlock Text="桌面字幕" Margin="6,0,0,0" FontSize="12"/></StackPanel>
+       </ToggleButton>
+      </StackPanel>
+     </Grid>
+     <Grid x:Name="PlayerTimeline" Grid.Row="1" Visibility="Collapsed">
+      <Grid.ColumnDefinitions>
+       <ColumnDefinition Width="48" />
+       <ColumnDefinition Width="*" />
+       <ColumnDefinition Width="48" />
+      </Grid.ColumnDefinitions>
+      <TextBlock x:Name="Elapsed" Text="00:00" Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center" />
+      <Slider x:Name="Progress" IsMoveToPointEnabled="False" Grid.Column="1" PreviewMouseMove="SeekMove" LostMouseCapture="SeekLostCapture" ToolTip="点击或拖动定位 · ← 后退3秒 / → 前进5秒" Minimum="0" Maximum="1" PreviewMouseLeftButtonDown="SeekStart" PreviewMouseLeftButtonUp="SeekEnd" PreviewKeyDown="SeekKey" AutomationProperties.Name="播放进度" />
+      <TextBlock x:Name="Total" Grid.Column="2" Text="00:00" Foreground="{StaticResource Muted}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" />
+     </Grid>
+     <TextBlock x:Name="NowPlaying" Grid.Row="2" Text="尚未播放" Foreground="#BAC3D9" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+    </Grid>
+   </Border>
+   <Border x:Name="StatusSurface" Grid.Row="2" Panel.ZIndex="20" VerticalAlignment="Bottom" HorizontalAlignment="Right" MaxWidth="640" Margin="10" Padding="16,10" CornerRadius="16" Background="#F02D2B46" Visibility="Collapsed" IsHitTestVisible="False"><TextBlock x:Name="Status" Text="" FontSize="13" Foreground="{StaticResource Ink}" TextWrapping="Wrap" /></Border>
+  </Grid>
+ </Grid>
+</Window>
